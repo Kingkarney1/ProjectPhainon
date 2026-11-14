@@ -13,6 +13,14 @@ namespace Phainon.Displays
         [SerializeField] internal TMP_Text value;
 
         private string lastText;
+        private string lastLabel;
+
+        public void SetLabel(string text)
+        {
+            if (label == null || text == lastLabel) return;
+            lastLabel = text;
+            label.text = text;
+        }
 
         public void Set(float fraction, Color color, string text = null)
         {

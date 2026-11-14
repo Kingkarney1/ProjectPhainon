@@ -26,10 +26,17 @@ MonoBehaviour:
     tankPressurizeSeconds: 4
     tankVentSeconds: 6
     feedReadyThreshold: 0.95
+    feedHoldUpSeconds: 1.5
+    faultEarliestSeconds: 25
+    faultLatestSeconds: 300
+    faultMinAltitudeMeters: 3000
+    pumpFaultDecaySeconds: 300
+    batteryFaultLoadWatts: 9000
+    weakEngineThrustFactor: 0.88
     navAlignSeconds: 6
     commsAcquireSeconds: 3.5
     oxygenStartFraction: 0.98
-    oxygenUsePerSecond: 0.000035
+    oxygenUsePerSecond: 0.0000011
     nominalCabinPressureKpa: 101.3
     unpoweredCabinPressureKpa: 94
     cabinPressureTimeConstant: 5

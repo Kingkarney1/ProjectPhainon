@@ -23,6 +23,10 @@ namespace Phainon.Simulation
         public bool BatteryBEnabled { get; set; }
         public bool MasterBusEnabled { get; private set; }
         public bool ApuEnabled { get; set; }
+        /// <summary>Latched by a fault. The APU will not run again until its switch has been set off.</summary>
+        public bool ApuTripped { get; private set; }
+        /// <summary>A shorted battery A loads the bus for as long as it stays connected.</summary>
+        public bool BatteryAFaulted { get; set; }
 
         public double BatteryACharge { get; private set; }
         public double BatteryBCharge { get; private set; }
@@ -60,11 +64,18 @@ namespace Phainon.Simulation
             return CommandResult.Ok("MAIN BUS ON");
         }
 
+        public void TripApu()
+        {
+            ApuTripped = true;
+            apuSpool = 0.0;
+        }
+
         public void Tick(double dt, double loadWatts)
         {
+            if (!ApuEnabled) ApuTripped = false;
             // The APU needs a live bus to start, but keeps running on its own output once online.
             bool busHasSource = MasterBusEnabled && (HasBatterySource || apuSpool >= 1.0);
-            bool apuCanRun = ApuEnabled && busHasSource;
+            bool apuCanRun = ApuEnabled && !ApuTripped && busHasSource;
             apuSpool = SimMath.MoveTowards(apuSpool, apuCanRun ? 1.0 : 0.0, dt / Math.Max(0.1, spec.apuStartSeconds));
 
             bool powered = IsBusPowered;

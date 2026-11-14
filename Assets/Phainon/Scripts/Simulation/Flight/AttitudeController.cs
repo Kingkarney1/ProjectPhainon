@@ -4,7 +4,8 @@ namespace Phainon.Simulation
 {
     /// <summary>
     /// Vehicle attitude: pitch above the local horizon, yaw out of the flight plane and roll about the nose.
-    /// With guidance active the flight computer steers pitch; otherwise the crew fly it by hand.
+    /// With guidance active the flight computer steers pitch: along the ascent profile while the
+    /// engine burns, or along the flight path (prograde) in ORBIT mode. Otherwise the crew fly it by hand.
     /// </summary>
     public class AttitudeController
     {
@@ -38,14 +39,14 @@ namespace Phainon.Simulation
         public bool HasControlAuthority { get; private set; }
         public bool RcsFiring { get; private set; }
 
-        public void Tick(double dt, FlightModel flight, EngineSystem engine, bool guidanceActive, bool busPowered, bool apuOnline)
+        public void Tick(double dt, FlightModel flight, EngineSystem engine, bool guidanceActive, bool progradeHold, bool busPowered, bool apuOnline)
         {
             bool gimbal = engine.IsBurning && apuOnline;
             bool rcs = RcsEnabled && busPowered;
             HasControlAuthority = gimbal || rcs;
             RcsFiring = false;
 
-            GuidancePitchDegrees = ComputeGuidancePitch(flight, engine);
+            GuidancePitchDegrees = progradeHold ? flight.FlightPathAngleDegrees : ComputeGuidancePitch(flight, engine);
 
             if (!flight.Released)
             {
@@ -55,9 +56,11 @@ namespace Phainon.Simulation
             }
             if (!HasControlAuthority) return;
 
-            if (guidanceActive && engine.IsBurning)
+            // The ascent profile only means something under thrust. Prograde hold also works while coasting.
+            if (guidanceActive && (engine.IsBurning || progradeHold))
             {
                 double target = GuidancePitchDegrees + PitchTrim * vehicle.pitchTrimRangeDegrees;
+                if (!gimbal && (Math.Abs(target - PitchDegrees) > 0.05 || Math.Abs(YawDegrees) > 0.05)) RcsFiring = true;
                 PitchDegrees = SimMath.MoveTowards(PitchDegrees, target, vehicle.guidancePitchRateDegPerSec * dt);
                 YawDegrees = SimMath.MoveTowards(YawDegrees, 0.0, vehicle.manualYawRateDegPerSec * dt);
             }

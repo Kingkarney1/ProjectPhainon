@@ -34,7 +34,8 @@ namespace Phainon.Simulation
 
     /// <summary>
     /// All tunable numbers describing the vehicle and its guidance. The values describe a
-    /// fictional two-stage crew launcher and are tuned for a six to eight minute ascent.
+    /// fictional crew launcher (two stages to orbit, plus a service module for leaving it) and are
+    /// tuned for a six to eight minute ascent.
     /// </summary>
     [Serializable]
     public class VehicleSpec
@@ -42,7 +43,7 @@ namespace Phainon.Simulation
         public string vehicleName = "PHAINON-1";
         public StageSpec[] stages = DefaultStages();
         /// <summary>Mass of the crew vehicle that remains after all stages are spent.</summary>
-        public double payloadMassKg = 26000;
+        public double payloadMassKg = 8000;
         /// <summary>Drag coefficient multiplied by reference area, in square metres.</summary>
         public double dragAreaCd = 38.0;
 
@@ -86,6 +87,13 @@ namespace Phainon.Simulation
                     name = "UPPER STAGE", dryMassKg = 11000, propellantMassKg = 130000,
                     thrustNewtons = 2150000, specificImpulseSeconds = 452,
                     spoolUpSeconds = 2.0, spoolDownSeconds = 0.6
+                },
+                // Crew vehicle plus this stage weigh what the payload alone used to, so the ascent is unchanged.
+                new StageSpec
+                {
+                    name = "SERVICE MODULE", dryMassKg = 2000, propellantMassKg = 16000,
+                    thrustNewtons = 250000, specificImpulseSeconds = 450,
+                    spoolUpSeconds = 1.0, spoolDownSeconds = 0.4
                 }
             };
         }

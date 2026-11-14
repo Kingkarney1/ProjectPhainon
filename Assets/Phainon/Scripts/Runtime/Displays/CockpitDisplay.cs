@@ -109,7 +109,9 @@ namespace Phainon.Displays
         protected static string Kilometres(double metres)
         {
             double km = metres / 1000.0;
-            return km < 1000.0 ? km.ToString("0.0") : km.ToString("0");
+            if (km < 1000.0) return km.ToString("0.0");
+            // Readouts are five characters wide: deep-space distances are shown in thousands of km.
+            return km < 100000.0 ? km.ToString("0") : (km / 1000.0).ToString("0") + "k";
         }
 
         protected static string Signed(double value, string format)

@@ -23,6 +23,7 @@ namespace Phainon.Environment
         [Header("1. Engine exhaust")]
         [SerializeField] internal Renderer[] boosterPlumes;
         [SerializeField] internal Renderer[] upperPlumes;
+        [SerializeField] internal Renderer[] servicePlumes;
         [SerializeField] internal Light plumeLight;
         [SerializeField] internal float plumeLightIntensity = 5f;
 
@@ -54,6 +55,8 @@ namespace Phainon.Environment
 
         [Header("5. Stage separation")]
         [SerializeField] internal Transform booster;
+        [Tooltip("Everything that leaves when the upper stage is dropped in orbit.")]
+        [SerializeField] internal Transform upperStage;
         [SerializeField] internal ParticleSystem separationFlash;
         [SerializeField] internal ParticleSystem separationGas;
         [SerializeField] internal float boosterDriftSeconds = 16f;
@@ -62,7 +65,10 @@ namespace Phainon.Environment
         private MaterialPropertyBlock block;
         private Vector3[] boosterRestScales;
         private Vector3[] upperRestScales;
+        private Vector3[] serviceRestScales;
         private bool boosterReleased;
+        /// <summary>The spent stage currently backing away from the vehicle.</summary>
+        private Transform drifting;
         private float boosterTimer;
         private Vector3 boosterVelocity;
 
@@ -74,6 +80,8 @@ namespace Phainon.Environment
             block = new MaterialPropertyBlock();
             boosterRestScales = RestScales(boosterPlumes);
             upperRestScales = RestScales(upperPlumes);
+            if (servicePlumes == null) servicePlumes = new Renderer[0];
+            serviceRestScales = RestScales(servicePlumes);
             spacecraft.Craft.Engine.StageSeparated += OnStageSeparated;
         }
 
@@ -104,7 +112,8 @@ namespace Phainon.Environment
         private void UpdateExhaust(Spacecraft craft)
         {
             float output = (float)craft.Engine.OutputFraction;
-            bool boosterStage = craft.Engine.ActiveStage == 0;
+            int stage = craft.Engine.ActiveStage;
+            bool boosterStage = stage == 0;
             // A plume balloons outward as ambient pressure falls away, and loses its sooty glow.
             float vacuum = 1f - Mathf.Sqrt(environment.Atmosphere);
             float expansion = Mathf.Lerp(1f, 3.2f, vacuum);
@@ -113,7 +122,9 @@ namespace Phainon.Environment
             for (int i = 0; i < boosterPlumes.Length; i++)
                 SetPlume(boosterPlumes[i], boosterRestScales[i], boosterStage && !boosterReleased ? output : 0f, expansion, flicker, vacuum);
             for (int i = 0; i < upperPlumes.Length; i++)
-                SetPlume(upperPlumes[i], upperRestScales[i], boosterStage ? 0f : output, expansion * 0.9f, flicker, vacuum);
+                SetPlume(upperPlumes[i], upperRestScales[i], stage == 1 ? output : 0f, expansion * 0.9f, flicker, vacuum);
+            for (int i = 0; i < servicePlumes.Length; i++)
+                SetPlume(servicePlumes[i], serviceRestScales[i], stage >= 2 ? output : 0f, expansion * 0.9f, flicker, vacuum);
 
             if (plumeLight != null) plumeLight.intensity = plumeLightIntensity * output * flicker;
         }
@@ -217,15 +228,19 @@ namespace Phainon.Environment
         {
             if (separationFlash != null) separationFlash.Play();
             if (separationGas != null) separationGas.Play();
-            if (booster == null) return;
-            boosterReleased = true;
+            // Only one spent stage is ever in view: the previous one is long gone by the next separation.
+            if (drifting != null) drifting.gameObject.SetActive(false);
+            drifting = droppedStage == 0 ? booster : upperStage;
+            if (droppedStage == 0) boosterReleased = true;
+            if (drifting == null) return;
             boosterTimer = 0f;
             boosterVelocity = new Vector3(0.35f, -0.2f, -3.5f);
         }
 
         private void UpdateBooster()
         {
-            if (!boosterReleased || booster == null || !booster.gameObject.activeSelf) return;
+            Transform booster = drifting;
+            if (booster == null || !booster.gameObject.activeSelf) return;
 
             // The spent stage backs away, slowly tumbling, until it is too small to matter.
             boosterTimer += Time.deltaTime;

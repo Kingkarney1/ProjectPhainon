@@ -51,6 +51,8 @@ namespace Phainon.UI
         private int toastCount;
         private float throttleFlash;
         private string lastObjective;
+        private string lastTitle;
+        private int lastRate;
 
         private void Awake()
         {
@@ -65,6 +67,7 @@ namespace Phainon.UI
             craft.Warnings.Raised += entry => Push(entry.Message, theme.ForSeverity(entry.Severity));
             craft.CommandHandled += OnCommandHandled;
             router.CommandRejected += (id, message) => Push(message, theme.cautionAmber);
+            spacecraft.TimeRateNotice += message => Push(message, theme.accentBlue);
         }
 
         private void OnCommandHandled(ControlId id, CommandResult result)
@@ -102,7 +105,14 @@ namespace Phainon.UI
             if (!show) return;
 
             MissionController mission = craft.Mission;
-            phaseTitle.text = mission.Spec.GetPhaseInfo(mission.Phase).title;
+            string title = mission.Spec.GetPhaseInfo(mission.Phase).title;
+            int rate = spacecraft.TimeRate;
+            if (title != lastTitle || rate != lastRate)
+            {
+                lastTitle = title;
+                lastRate = rate;
+                phaseTitle.text = rate > 1 ? title + "   TIME x" + rate : title;
+            }
             phaseTitle.color = mission.IsFailed ? theme.warningRed : (mission.IsComplete ? theme.nominalGreen : theme.accentBlue);
             clockText.text = mission.FormatClock();
 

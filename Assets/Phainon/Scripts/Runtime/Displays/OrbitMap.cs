@@ -88,7 +88,8 @@ namespace Phainon.Displays
         /// <summary>Launch site is drawn at the top of the Earth; travel downrange runs clockwise.</summary>
         private Vector2 Project(float downrangeAngle, float altitudeMeters)
         {
-            float radius = earthRadius * 0.5f * (1f + altitudeMeters / (float)FlightModel.EarthRadius * altitudeExaggeration);
+            // Far from Earth the true position is off the map; it is held at the rim.
+            float radius = Mathf.Min(0.49f, earthRadius * 0.5f * (1f + altitudeMeters / (float)FlightModel.EarthRadius * altitudeExaggeration));
             float angle = Mathf.PI * 0.5f - downrangeAngle;
             return new Vector2(0.5f + Mathf.Cos(angle) * radius, 0.5f + Mathf.Sin(angle) * radius);
         }

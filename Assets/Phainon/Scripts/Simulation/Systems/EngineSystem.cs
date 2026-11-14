@@ -25,7 +25,13 @@ namespace Phainon.Simulation
             this.vehicle = vehicle;
             this.fuel = fuel;
             ThrustLimit = 1.0;
+            ThrustFactor = 1.0;
         }
+
+        /// <summary>Share of rated thrust the active engine can deliver. Below 1 after a fault; a new stage starts healthy.</summary>
+        public double ThrustFactor { get; private set; }
+
+        public void DegradeThrust(double factor) { ThrustFactor = SimMath.Clamp01(factor); }
 
         public EngineState State { get; private set; }
         public int ActiveStage { get; private set; }
@@ -87,6 +93,7 @@ namespace Phainon.Simulation
             spool = 0.0;
             tailOff = 0.0;
             cutoffOutput = 0.0;
+            ThrustFactor = 1.0;
             ThrustNewtons = 0.0;
             OutputFraction = 0.0;
             if (StageSeparated != null) StageSeparated(dropped);
@@ -113,7 +120,7 @@ namespace Phainon.Simulation
             double output;
             if (IsBurning)
             {
-                output = spool * EffectiveThrottle;
+                output = spool * EffectiveThrottle * ThrustFactor;
             }
             else
             {

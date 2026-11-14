@@ -29,7 +29,14 @@ MonoBehaviour:
       specificImpulseSeconds: 452
       spoolUpSeconds: 2
       spoolDownSeconds: 0.6
-    payloadMassKg: 26000
+    - name: SERVICE MODULE
+      dryMassKg: 2000
+      propellantMassKg: 16000
+      thrustNewtons: 250000
+      specificImpulseSeconds: 450
+      spoolUpSeconds: 1
+      spoolDownSeconds: 0.4
+    payloadMassKg: 8000
     dragAreaCd: 38
     ascentPitchProgram:
     - altitudeMeters: 0

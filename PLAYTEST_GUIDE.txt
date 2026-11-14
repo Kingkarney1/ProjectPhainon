@@ -3,7 +3,8 @@ Private playtest build 0.1.0
 
 Thank you for testing. This is an early prototype of a spacecraft cockpit simulator: you sit in
 the command seat, power the spacecraft up switch by switch, and fly it from the launch pad into
-orbit. One mission, about ten minutes. Please do not share this build.
+orbit. About ten minutes to orbit; after that you can leave Earth behind. Please do not share
+this build.
 
 
 WHAT YOU NEED
@@ -54,9 +55,13 @@ CONTROLS
   Outside cameras ........ CAM SELECT on the overhead panel (key 6) swaps the right-hand display
                            between the hull camera and a chase camera. Watch a launch on chase.
   Hide / show the guide .. H
+  Answer the radio ....... 7, 8 or 9 picks the numbered reply when Ground Control asks a question
+  Radio log .............. C
+  Time rate .............. . (full stop) faster, , (comma) slower. Only in orbit or beyond, engine off.
   Pause, restart, quit ... Esc
 
   The box at the top left always says what to do next, and the control it wants pulses amber.
+  Ground Control talks to you in the box at the top right once COMMS and S-BAND XMIT are on.
   The displays are small from the seat: press 2 and hold Z to read them.
 
 
@@ -73,6 +78,17 @@ FLYING THE MISSION
   7. When the booster burns out: lift the guard and press STAGE SEP, then ENGINE IGNITION again.
   8. When ORBIT GO lights up, press ENGINE CUTOFF. You are in orbit.
 
+  LEAVING EARTH (optional, after "Continue flight")
+  9.  Lift the guard and press STAGE SEP to drop the upper stage.
+  10. Right console (press 5): turn NAV MODE to ORBIT, GUIDANCE on, RCS on.
+  11. Full throttle, then ENGINE IGNITION. Hold the burn until APOAPSIS on the left display
+      reads ESCAPE, then press ENGINE CUTOFF (or burn the tank dry for more speed).
+  12. Press . to speed time up. The right-hand display's aft camera looks back at Earth.
+      Ground Control calls out the distance, and its replies take longer the farther you go.
+
+  Something breaks on every flight, and it is different each time: a caution appears, and the
+  box at the top left tells you which switch to work. Ground Control helps if the radio is up.
+
   You can fail: running out of fuel, falling back to Earth, or pressing ABORT ends the mission.
   Esc, then "Restart mission" starts again.
 
@@ -82,6 +98,7 @@ KNOWN ISSUES
   - No settings menu yet: no volume, resolution, graphics or key-binding options. Alt+Enter
     (Windows, Linux) or Cmd+F (Mac) switches between full screen and a window.
   - No save. The mission is short enough to replay.
+  - Leaving Earth: only Earth's gravity is modelled, and the Moon is a picture, not a place.
   - No gamepad support.
 
 

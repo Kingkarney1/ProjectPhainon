@@ -15,6 +15,8 @@ namespace Phainon.Simulation
         private readonly List<MissionEvent> events = new List<MissionEvent>();
         private double peakDynamicPressure;
         private ChecklistItem holdItem;
+        private int nextDistanceMark;
+        private bool departureBurnCalled;
 
         public MissionController(MissionSpec spec, Spacecraft craft)
         {
@@ -39,6 +41,8 @@ namespace Phainon.Simulation
         public bool OrbitGo { get; private set; }
         public bool IsComplete { get { return Phase == MissionPhase.OuterSpace; } }
         public bool IsFailed { get { return Phase == MissionPhase.Failed; } }
+        /// <summary>True once the vehicle has more than enough speed to never fall back to Earth.</summary>
+        public bool HasEscaped { get; private set; }
         public string FailureReason { get; private set; }
 
         public IReadOnlyList<ChecklistItem> Checklist { get { return checklist; } }
@@ -120,6 +124,9 @@ namespace Phainon.Simulation
             if (!HasLiftedOff) return CommandResult.Rejected("SEPARATION INHIBITED - ON PAD");
             if (craft.Flight.AltitudeMeters < spec.stageSeparationMinAltitudeMeters)
                 return CommandResult.Rejected("SEPARATION INHIBITED - BELOW " + (int)(spec.stageSeparationMinAltitudeMeters / 1000) + " KM");
+            // The upper stage is what reaches orbit; it can only be dropped once it has.
+            if (craft.Engine.ActiveStage > 0 && Phase != MissionPhase.OuterSpace)
+                return CommandResult.Rejected("SEPARATION INHIBITED - NOT YET IN ORBIT");
             return craft.Engine.SeparateStage();
         }
 
@@ -157,6 +164,7 @@ namespace Phainon.Simulation
                 case MissionPhase.Ascent: TickAscent(); break;
                 case MissionPhase.StageSeparation: TickStageSeparation(); break;
                 case MissionPhase.OrbitalInsertion: TickOrbitalInsertion(); break;
+                case MissionPhase.OuterSpace: TickOuterSpace(); break;
             }
 
             UpdateObjective();
@@ -294,6 +302,38 @@ namespace Phainon.Simulation
                 Fail("Propellant was exhausted before reaching orbital velocity.");
         }
 
+        private void TickOuterSpace()
+        {
+            if (CheckTrajectoryLoss()) return;
+            FlightModel flight = craft.Flight;
+
+            if (!HasEscaped && double.IsInfinity(flight.ApoapsisMeters))
+            {
+                HasEscaped = true;
+                Announce(MissionEventId.EarthEscape, "EARTH ESCAPE VELOCITY");
+            }
+            else if (HasEscaped && !double.IsInfinity(flight.ApoapsisMeters) && !craft.Engine.IsBurning)
+            {
+                // A burn against the flight path can give escape back.
+                HasEscaped = false;
+            }
+
+            double[] marks = spec.distanceMarksKm;
+            while (marks != null && nextDistanceMark < marks.Length && flight.AltitudeMeters >= marks[nextDistanceMark] * 1000.0)
+            {
+                Announce(MissionEventId.DistanceMark, marks[nextDistanceMark].ToString("N0", System.Globalization.CultureInfo.InvariantCulture) + " KM FROM EARTH");
+                nextDistanceMark++;
+            }
+        }
+
+        /// <summary>Raises an event that is not a row of the ascent timeline, and calls it out.</summary>
+        private void Announce(MissionEventId id, string label)
+        {
+            Notify(label);
+            if (EventReached != null)
+                EventReached(new MissionEvent { Id = id, Label = label, Status = MissionEventStatus.Done, MetSeconds = MissionElapsedSeconds });
+        }
+
         private bool CheckTrajectoryLoss()
         {
             FlightModel flight = craft.Flight;
@@ -309,7 +349,12 @@ namespace Phainon.Simulation
 
         private void OnEngineIgnited(int stage)
         {
-            Notify(stage == 0 ? "MAIN ENGINE IGNITION" : "UPPER STAGE IGNITION");
+            Notify(stage == 0 ? "MAIN ENGINE IGNITION" : (stage == 1 ? "UPPER STAGE IGNITION" : "SERVICE MODULE IGNITION"));
+            if (Phase == MissionPhase.OuterSpace && !departureBurnCalled)
+            {
+                departureBurnCalled = true;
+                Announce(MissionEventId.DepartureBurn, "DEPARTURE BURN");
+            }
         }
 
         private void OnEngineShutDown(int stage, EngineShutdownReason reason)
@@ -317,7 +362,7 @@ namespace Phainon.Simulation
             switch (reason)
             {
                 case EngineShutdownReason.PropellantDepleted:
-                    Notify(stage == 0 ? "BOOSTER PROPELLANT DEPLETED" : "UPPER STAGE PROPELLANT DEPLETED");
+                    Notify(craft.VehicleSpec.stages[stage].name + " PROPELLANT DEPLETED");
                     break;
                 case EngineShutdownReason.FeedPressureLost:
                     Notify("ENGINE FLAMEOUT - FEED PRESSURE LOST");
@@ -330,6 +375,11 @@ namespace Phainon.Simulation
 
         private void OnStageSeparated(int droppedStage)
         {
+            if (droppedStage > 0)
+            {
+                Announce(MissionEventId.UpperStageJettison, "UPPER STAGE JETTISONED");
+                return;
+            }
             MarkEvent(MissionEventId.BoosterCutoff);
             MarkEvent(MissionEventId.StageSeparation);
             SetActive(MissionEventId.UpperStageIgnition);
@@ -371,7 +421,9 @@ namespace Phainon.Simulation
             Set(3, propellantGo, HasLiftedOff ? "DEPLETED" : "LOW");
             Set(4, craft.Fuel.FeedReady, craft.Fuel.FeedPressure > 0.01 ? "PRESSURISING" : "OFF");
             Set(5, craft.Navigation.Aligned, craft.Navigation.Enabled ? "ALIGNING" : "OFF");
-            Set(6, craft.Navigation.Mode == NavMode.Ascent, craft.Navigation.Mode == NavMode.Standby ? "STBY" : "ORBIT");
+            // ASCENT is required to launch. Once flying, ORBIT (prograde hold) is as valid a mode as ASCENT.
+            bool navModeGo = HasLiftedOff ? craft.Navigation.Mode != NavMode.Standby : craft.Navigation.Mode == NavMode.Ascent;
+            Set(6, navModeGo, craft.Navigation.Mode == NavMode.Standby ? "STBY" : "ORBIT");
             Set(7, craft.Navigation.GuidanceEnabled, "OFF");
             Set(8, craft.Comms.LinkEstablished, craft.Comms.Enabled && craft.Comms.AntennaEnabled ? "ACQUIRING" : "NO LINK");
             Set(9, craft.LifeSupport.Nominal, craft.LifeSupport.Enabled ? "PRESSURISING" : "OFF");
@@ -500,12 +552,64 @@ namespace Phainon.Simulation
                     break;
 
                 case MissionPhase.OuterSpace:
-                    text = "Orbit achieved. Set GUIDANCE OFF and RCS ON to fly attitude by hand.";
+                    if (craft.Engine.IsBurning)
+                    {
+                        text = HasEscaped
+                            ? "Escape velocity reached. Burn on for more speed, or press ENGINE CUTOFF to keep the propellant."
+                            : "Departure burn. Hold it until APOAPSIS on the left display reads ESCAPE.";
+                    }
+                    else if (HasEscaped)
+                    {
+                        text = "Coasting away from Earth. The aft camera on the right display looks back at it. Press . to speed time up and , to slow it.";
+                    }
+                    else if (craft.Engine.ActiveStage == 1)
+                    {
+                        text = "Orbit achieved. To leave Earth, lift the guard and press STAGE SEP to drop the upper stage.";
+                        control = ControlId.StageSeparation;
+                    }
+                    else if (!craft.Fuel.HasPropellant(craft.Engine.ActiveStage))
+                    {
+                        text = "Propellant is spent and you are still in Earth orbit. Press . to speed time up and , to slow it.";
+                    }
+                    else if (craft.Navigation.Mode != NavMode.Orbit)
+                    {
+                        text = "Turn NAV MODE to ORBIT. The computer will hold the nose along the flight path.";
+                        control = ControlId.NavMode;
+                    }
+                    else if (!craft.Navigation.GuidanceEnabled)
+                    {
+                        text = "Set GUIDANCE ON for the departure burn.";
+                        control = ControlId.Guidance;
+                    }
+                    else if (!craft.Attitude.RcsEnabled)
+                    {
+                        text = "Set RCS ON so the vehicle can turn while the engine is off.";
+                        control = ControlId.Rcs;
+                    }
+                    else if (craft.Engine.ThrottleCommand < 0.9)
+                    {
+                        text = "Set the throttle to full for the departure burn.";
+                        control = ControlId.Throttle;
+                    }
+                    else
+                    {
+                        text = "Lift the guard and press ENGINE IGNITION to start the departure burn.";
+                        control = ControlId.EngineIgnition;
+                    }
                     break;
 
                 default:
                     text = FailureReason ?? "Mission failed.";
                     break;
+            }
+
+            // A repair step comes first: a fault can block the very action the flight is asking for
+            // (no APU, no ignition). Fault status with nothing to operate only fills an idle guide.
+            if (HasLiftedOff && Phase != MissionPhase.Failed && craft.Faults != null)
+            {
+                ControlId repair;
+                string advice = craft.Faults.GetAdvice(out repair);
+                if (advice != null && (repair != ControlId.None || control == ControlId.None)) { text = advice; control = repair; }
             }
 
             CurrentObjective = text;

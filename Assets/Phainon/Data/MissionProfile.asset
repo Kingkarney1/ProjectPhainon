@@ -23,6 +23,11 @@ MonoBehaviour:
     reentryFailAltitudeMeters: 60000
     spaceBoundaryAltitudeMeters: 100000
     maxQDetectMinPa: 8000
+    distanceMarksKm:
+    - 10000
+    - 100000
+    - 384400
+    - 1000000
     phases:
     - phase: 0
       title: PRE-LAUNCH
@@ -38,7 +43,7 @@ MonoBehaviour:
       objective: Burn to orbital velocity. Cut the engine when ORBIT GO illuminates.
     - phase: 4
       title: OUTER SPACE
-      objective: 'Stable orbit achieved. The spacecraft is yours: attitude and propulsion remain live.'
+      objective: Stable orbit achieved. Stay, or drop the upper stage and burn the service module to leave Earth.
     - phase: 5
       title: MISSION FAILED
       objective: The mission cannot continue. Restart from the pause menu.

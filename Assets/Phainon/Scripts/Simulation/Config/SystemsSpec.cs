@@ -23,13 +23,27 @@ namespace Phainon.Simulation
         public double tankVentSeconds = 6.0;
         public double feedReadyThreshold = 0.95;
 
+        /// <summary>Seconds the feed lines hold pressure after the pumps stop.</summary>
+        public double feedHoldUpSeconds = 1.5;
+
+        // Faults.
+        /// <summary>A random fault is scheduled between these mission elapsed times, in seconds.</summary>
+        public double faultEarliestSeconds = 25;
+        public double faultLatestSeconds = 300;
+        public double faultMinAltitudeMeters = 3000;
+        /// <summary>Seconds for a failing pump to lose all feed pressure. The engine starves long before that.</summary>
+        public double pumpFaultDecaySeconds = 300;
+        public double batteryFaultLoadWatts = 9000;
+        public double weakEngineThrustFactor = 0.88;
+
         // Navigation and communications.
         public double navAlignSeconds = 6.0;
         public double commsAcquireSeconds = 3.5;
 
         // Life support.
         public double oxygenStartFraction = 0.98;
-        public double oxygenUsePerSecond = 0.000035;
+        /// <summary>The reserve lasts about ten days.</summary>
+        public double oxygenUsePerSecond = 0.0000011;
         public double nominalCabinPressureKpa = 101.3;
         public double unpoweredCabinPressureKpa = 94.0;
         /// <summary>Seconds for pressure to settle with the cabin loop running.</summary>

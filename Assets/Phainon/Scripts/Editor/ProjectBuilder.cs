@@ -23,7 +23,7 @@ namespace Phainon.EditorTools
         /// Raise this whenever the builders change what they generate. An open editor then rebuilds
         /// the scene by itself, so the scene on disk can never lag behind the code that makes it.
         /// </summary>
-        public const int BuildVersion = 6;
+        public const int BuildVersion = 9;
         private const string StampPath = "Library/PhainonBuildVersion.txt";
 
         public static bool SceneIsCurrent
@@ -222,6 +222,7 @@ namespace Phainon.EditorTools
             spacecraft.vehicleConfig = assets.Vehicle;
             spacecraft.systemsConfig = assets.Systems;
             spacecraft.missionProfile = assets.Mission;
+            spacecraft.commsScript = assets.GroundControl;
             var game = systems.AddComponent<GameManager>();
             game.spacecraft = spacecraft;
 

@@ -69,21 +69,31 @@ namespace Phainon.Displays
         {
             CockpitTheme t = Theme;
             EngineSystem engine = craft.Engine;
-            bool separated = engine.ActiveStage > 0;
 
-            if (separated) boosterStatus.Set("JETTISONED", t.textDim);
-            else if (engine.IsBurning) boosterStatus.Set("BURNING  " + (craft.Fuel.GetFraction(0) * 100.0).ToString("0") + "%", t.nominalGreen);
-            else if (!craft.Fuel.HasPropellant(0)) boosterStatus.Set("SPENT", t.cautionAmber);
-            else boosterStatus.Set("ATTACHED", t.textPrimary);
+            // Two rows for three stages: they show the active stage and its neighbour.
+            int first = Mathf.Clamp(engine.ActiveStage, 0, Mathf.Max(0, craft.VehicleSpec.stages.Length - 2));
+            SetStage(boosterStatus, craft, first);
+            SetStage(upperStageStatus, craft, first + 1);
 
-            if (!separated) upperStageStatus.Set("STANDBY", t.textDim);
-            else if (engine.IsBurning) upperStageStatus.Set("BURNING  " + (craft.Fuel.GetFraction(1) * 100.0).ToString("0") + "%", t.nominalGreen);
-            else if (!craft.Fuel.HasPropellant(1)) upperStageStatus.Set("SPENT", t.cautionAmber);
-            else upperStageStatus.Set(craft.Mission.IsComplete ? "SHUTDOWN" : "READY", t.textPrimary);
-
-            if (separated) separationStatus.Set("CONFIRMED", t.nominalGreen);
-            else if (craft.Mission.StageSeparationReady) separationStatus.Set("READY - SEPARATE", t.BlinkPhase(Time.unscaledTime) ? t.cautionAmber : t.textDim);
+            if (craft.Mission.StageSeparationReady) separationStatus.Set("READY - SEPARATE", t.BlinkPhase(Time.unscaledTime) ? t.cautionAmber : t.textDim);
+            else if (engine.ActiveStage == 1 && craft.Mission.IsComplete && !engine.IsBurning) separationStatus.Set("AVAILABLE", t.textPrimary);
+            else if (engine.ActiveStage > 0) separationStatus.Set("CONFIRMED", t.nominalGreen);
             else separationStatus.Set("LOCKED", t.textDim);
+        }
+
+        private void SetStage(StatusRow row, Spacecraft craft, int stage)
+        {
+            CockpitTheme t = Theme;
+            EngineSystem engine = craft.Engine;
+            if (stage >= craft.VehicleSpec.stages.Length) return;
+            row.SetLabel(craft.VehicleSpec.stages[stage].name);
+
+            if (stage < engine.ActiveStage) row.Set("JETTISONED", t.textDim);
+            else if (stage > engine.ActiveStage) row.Set("STANDBY", t.textDim);
+            else if (engine.IsBurning) row.Set("BURNING  " + (craft.Fuel.GetFraction(stage) * 100.0).ToString("0") + "%", t.nominalGreen);
+            else if (!craft.Fuel.HasPropellant(stage)) row.Set("SPENT", t.cautionAmber);
+            else if (stage == 0) row.Set("ATTACHED", t.textPrimary);
+            else row.Set(engine.State == EngineState.Shutdown ? "SHUTDOWN" : "READY", t.textPrimary);
         }
 
         private void RefreshEvents(MissionController mission)

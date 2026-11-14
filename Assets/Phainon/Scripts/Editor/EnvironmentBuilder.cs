@@ -196,18 +196,32 @@ namespace Phainon.EditorTools
             }, 40));
             SceneKit.MeshObject("Capsule", exterior, Vector3.zero, capsuleMesh, white);
 
+            // Service module: stays with the capsule. Its engine sits inside the upper stage's adapter until that is dropped.
+            Mesh serviceMesh = assets.SaveMesh(MeshFactory.Lathe("ServiceModuleHull", new[]
+            {
+                new Vector2(2.5f, -1.35f), new Vector2(2.5f, -6.2f), new Vector2(1.0f, -6.7f)
+            }, 40));
+            SceneKit.MeshObject("Service Module", exterior, Vector3.zero, serviceMesh, white);
+            SceneKit.Cylinder("Service Module Band", exterior, new Vector3(0f, 0f, -3.8f), 2.53f, 1.0f, darkMetal, Axis.Z);
+            Mesh serviceNozzleMesh = assets.SaveMesh(MeshFactory.Lathe("ServiceNozzle", new[]
+            {
+                new Vector2(0.35f, -6.6f), new Vector2(0.6f, -7.2f), new Vector2(0.95f, -8.1f)
+            }, 28));
+            SceneKit.MeshObject("Service Module Nozzle", exterior, Vector3.zero, serviceNozzleMesh, nozzle);
+
+            // Upper stage group: everything that falls away when it is dropped in orbit.
+            Transform upperStage = SceneKit.Empty("Upper Stage", exterior, Vector3.zero).transform;
             Mesh upperMesh = assets.SaveMesh(MeshFactory.Lathe("UpperStageHull", new[]
             {
-                new Vector2(2.5f, -1.35f), new Vector2(2.5f, -6.2f), new Vector2(2.75f, -7.4f), new Vector2(2.75f, -21.0f), new Vector2(1.2f, -22.2f)
+                new Vector2(2.5f, -6.2f), new Vector2(2.75f, -7.4f), new Vector2(2.75f, -21.0f), new Vector2(1.2f, -22.2f)
             }, 40));
-            SceneKit.MeshObject("Service Module and Upper Stage", exterior, Vector3.zero, upperMesh, white);
-            SceneKit.Cylinder("Service Module Band", exterior, new Vector3(0f, 0f, -3.8f), 2.53f, 1.0f, darkMetal, Axis.Z);
+            SceneKit.MeshObject("Upper Stage Hull", upperStage, Vector3.zero, upperMesh, white);
 
             Mesh upperNozzleMesh = assets.SaveMesh(MeshFactory.Lathe("UpperNozzle", new[]
             {
                 new Vector2(0.45f, -21.6f), new Vector2(0.9f, -22.8f), new Vector2(1.45f, -24.4f)
             }, 28));
-            SceneKit.MeshObject("Upper Stage Nozzle", exterior, Vector3.zero, upperNozzleMesh, nozzle);
+            SceneKit.MeshObject("Upper Stage Nozzle", upperStage, Vector3.zero, upperNozzleMesh, nozzle);
 
             // Booster group: everything that falls away at stage separation.
             Transform booster = SceneKit.Empty("Core Booster", exterior, Vector3.zero).transform;
@@ -242,6 +256,7 @@ namespace Phainon.EditorTools
             }, 28));
             var boosterPlumes = new System.Collections.Generic.List<Renderer>();
             var upperPlumes = new System.Collections.Generic.List<Renderer>();
+            var servicePlumes = new System.Collections.Generic.List<Renderer>();
             System.Action<System.Collections.Generic.List<Renderer>, string, Vector3, float, float> addPlume = (list, name, at, radius, length) =>
             {
                 GameObject outer = SceneKit.MeshObject(name + " Plume", exterior, at, plumeMesh, plumeMaterial);
@@ -255,6 +270,7 @@ namespace Phainon.EditorTools
             addPlume(boosterPlumes, "Strap-on A", new Vector3(0f, 6.0f, -61.4f), 3.2f, 62f);
             addPlume(boosterPlumes, "Strap-on B", new Vector3(0f, -6.0f, -61.4f), 3.2f, 62f);
             addPlume(upperPlumes, "Upper Stage", new Vector3(0f, 0f, -24.2f), 2.6f, 34f);
+            addPlume(servicePlumes, "Service Module", new Vector3(0f, 0f, -8.0f), 1.1f, 14f);
 
             Light plumeLight = SceneKit.PointLight("Plume Light", exterior, new Vector3(0f, 0f, -66f), new Color(1f, 0.7f, 0.4f), 0f, 130f);
 
@@ -305,6 +321,8 @@ namespace Phainon.EditorTools
             Effects.vehicle = exterior;
             Effects.boosterPlumes = boosterPlumes.ToArray();
             Effects.upperPlumes = upperPlumes.ToArray();
+            Effects.servicePlumes = servicePlumes.ToArray();
+            Effects.upperStage = upperStage;
             Effects.plumeLight = plumeLight;
             Effects.padBillows = padBillows;
             Effects.padJets = padJets;

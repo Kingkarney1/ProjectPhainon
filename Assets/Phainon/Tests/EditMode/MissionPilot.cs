@@ -18,6 +18,8 @@ namespace Phainon.Tests
         public bool RespectLimits = true;
         /// <summary>Seconds the pilot waits before acting on staging and upper stage ignition.</summary>
         public double ReactionDelay = 2.0;
+        /// <summary>Extra crew work done every tick of the flight, such as following a fault procedure.</summary>
+        public Action OnTick;
 
         private double throttle;
 
@@ -84,6 +86,7 @@ namespace Phainon.Tests
             {
                 MissionController mission = Craft.Mission;
                 ManageThrottle();
+                if (OnTick != null) OnTick();
 
                 bool needsAction = mission.StageSeparationReady
                                    || (mission.Phase == MissionPhase.StageSeparation && Craft.Engine.ActiveStage > 0 && !Craft.Engine.IsBurning);

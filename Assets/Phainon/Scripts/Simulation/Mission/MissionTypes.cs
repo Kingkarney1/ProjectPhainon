@@ -6,7 +6,12 @@ namespace Phainon.Simulation
 
     public enum MissionEventStatus { Pending, Active, Done }
 
-    public enum MissionEventId { Liftoff, MaxQ, BoosterCutoff, StageSeparation, UpperStageIgnition, OrbitGo, OrbitAchieved }
+    public enum MissionEventId
+    {
+        Liftoff, MaxQ, BoosterCutoff, StageSeparation, UpperStageIgnition, OrbitGo, OrbitAchieved,
+        // Beyond orbit. These are announced as they happen and are not rows of the ascent timeline.
+        UpperStageJettison, DepartureBurn, EarthEscape, DistanceMark
+    }
 
     /// <summary>One row of the pre-launch GO / NO-GO board.</summary>
     public class ChecklistItem

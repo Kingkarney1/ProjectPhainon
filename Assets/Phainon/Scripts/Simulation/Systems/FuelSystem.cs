@@ -8,6 +8,7 @@ namespace Phainon.Simulation
         private readonly SystemsSpec spec;
         private readonly double[] capacityKg;
         private readonly double[] propellantKg;
+        private double holdUp;
 
         public FuelSystem(VehicleSpec vehicle, SystemsSpec spec)
         {
@@ -24,6 +25,10 @@ namespace Phainon.Simulation
 
         public bool PumpsEnabled { get; set; }
         public bool TankPressEnabled { get; set; }
+        /// <summary>Latched by a fault: the pump runs but cannot hold pressure until its switch is cycled.</summary>
+        public bool PumpFaulted { get; private set; }
+
+        public void FaultPump() { PumpFaulted = true; }
 
         /// <summary>Feed line pressure as a 0..1 fraction of nominal.</summary>
         public double FeedPressure { get; private set; }
@@ -42,10 +47,24 @@ namespace Phainon.Simulation
 
         public void Tick(double dt, bool busPowered)
         {
+            if (!PumpsEnabled) PumpFaulted = false;
             bool pressurising = PumpsEnabled && TankPressEnabled && busPowered;
-            double rate = pressurising ? dt / Math.Max(0.1, spec.tankPressurizeSeconds)
-                                       : dt / Math.Max(0.1, spec.tankVentSeconds);
-            FeedPressure = SimMath.MoveTowards(FeedPressure, pressurising ? 1.0 : 0.0, rate);
+            if (pressurising && !PumpFaulted)
+            {
+                holdUp = spec.feedHoldUpSeconds;
+                FeedPressure = SimMath.MoveTowards(FeedPressure, 1.0, dt / Math.Max(0.1, spec.tankPressurizeSeconds));
+            }
+            else if (pressurising)
+            {
+                // A failing pump loses pressure slowly, which is the crew's warning.
+                FeedPressure = SimMath.MoveTowards(FeedPressure, 0.0, dt / Math.Max(0.1, spec.pumpFaultDecaySeconds));
+            }
+            else
+            {
+                // The lines hold pressure for a moment after the pumps stop, long enough to cycle a switch.
+                holdUp -= dt;
+                if (holdUp <= 0.0) FeedPressure = SimMath.MoveTowards(FeedPressure, 0.0, dt / Math.Max(0.1, spec.tankVentSeconds));
+            }
             LastFlowKgPerSec = 0.0;
         }
 

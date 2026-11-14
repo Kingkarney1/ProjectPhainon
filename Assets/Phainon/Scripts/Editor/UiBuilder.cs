@@ -129,8 +129,43 @@ namespace Phainon.EditorTools
 
             // Key reminder, bottom left.
             RectTransform keys = Pinned("Key Reminder", root, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28f, 22f), new Vector2(1300f, 26f));
-            ui.Text(keys, "RMB look    LMB operate    Scroll adjust    1-6 views    Z zoom    Shift / Ctrl throttle    W S A D Q E attitude    Esc pause",
+            ui.Text(keys, "RMB look    LMB operate    Scroll adjust    1-6 views    Z zoom    Shift / Ctrl throttle    W S A D Q E attitude    7 8 9 radio reply    C radio log    , . time rate    Esc pause",
                 15f, new Color(theme.textDim.r, theme.textDim.g, theme.textDim.b, 0.8f), TextAlignmentOptions.Left);
+
+            BuildComms(root, spacecraft, game);
+        }
+
+        /// <summary>The radio panel, top right and clear of the displays, with the message log below it.</summary>
+        private void BuildComms(RectTransform root, SpacecraftController spacecraft, GameManager game)
+        {
+            const float width = 500f;
+            const float inner = width - 44f;
+            var corner = new Vector2(1f, 1f);
+            RectTransform panel = Pinned("Ground Control", root, corner, corner, new Vector2(-28f, -28f), new Vector2(width, 250f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            ui.Image("Accent", panel, 0f, 18f, 4f, 214f, theme.accentBlue);
+
+            var comms = panel.gameObject.AddComponent<CommsPanel>();
+            comms.spacecraft = spacecraft;
+            comms.game = game;
+            comms.theme = theme;
+            comms.group = panel.gameObject.AddComponent<CanvasGroup>();
+
+            ui.Text("Title", panel, 22f, 10f, 200f, 20f, "GROUND CONTROL", 14f, theme.textDim, TextAlignmentOptions.Left, FontStyles.Bold);
+            comms.signalText = ui.Text("Signal", panel, 222f, 10f, inner - 200f, 20f, "NO LINK", 14f, theme.cautionAmber, TextAlignmentOptions.Right, FontStyles.Bold);
+            comms.speakerText = ui.Text("Speaker", panel, 22f, 34f, 330f, 26f, "", 19f, theme.accentBlue, TextAlignmentOptions.Left, FontStyles.Bold);
+            comms.stampText = ui.Text("Stamp", panel, 352f, 36f, inner - 330f, 24f, "", 16f, theme.textDim, TextAlignmentOptions.Right);
+            comms.bodyText = ui.Text("Body", panel, 22f, 64f, inner, 110f, "", 18f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+
+            comms.replyRows = new TMP_Text[3];
+            for (int i = 0; i < comms.replyRows.Length; i++)
+                comms.replyRows[i] = ui.Text("Reply " + (i + 1), panel, 22f, 178f + i * 21f, inner, 20f, "", 17f, theme.cautionAmber, TextAlignmentOptions.Left);
+
+            RectTransform log = Pinned("Radio Log", root, corner, corner, new Vector2(-28f, -286f), new Vector2(width, 420f));
+            ui.Image(log, PanelColor, assets.RoundedPanel, true);
+            ui.Text("Title", log, 22f, 10f, 400f, 20f, "RADIO LOG   newest first", 14f, theme.textDim, TextAlignmentOptions.Left, FontStyles.Bold);
+            comms.logText = ui.Text("Messages", log, 22f, 38f, inner, 370f, "", 15f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+            comms.logPanel = log.gameObject;
         }
 
         // ---------------------------------------------------------------- menus
@@ -252,7 +287,7 @@ namespace Phainon.EditorTools
             ui.Image("Rule", panel, 160f, 152f, 500f, 2f, theme.nominalGreen);
             Menus.completeSummary = ui.Text("Summary", panel, 150f, 176f, 520f, 150f, "", 22f, theme.textPrimary, TextAlignmentOptions.TopLeft);
             ui.Text("Note", panel, 110f, 330f, 600f, 56f,
-                "The spacecraft is still live. Continue to fly it from the command seat.", 18f, theme.textDim, TextAlignmentOptions.Center, FontStyles.Normal, true);
+                "The spacecraft is still live. Continue the flight to stay in orbit, or to drop the upper stage and leave Earth.", 18f, theme.textDim, TextAlignmentOptions.Center, FontStyles.Normal, true);
             Menus.continueButton = MenuButton(panel, 210f, 396f, 400f, "CONTINUE FLIGHT", true);
             Menus.completeRestartButton = MenuButton(panel, 210f, 470f, 400f, "RESTART MISSION", false);
             Menus.completeMenuButton = MenuButton(panel, 210f, 544f, 400f, "MAIN MENU", false);

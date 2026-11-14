@@ -20,6 +20,7 @@ namespace Phainon.EditorTools
         public VehicleConfig Vehicle { get; private set; }
         public SystemsConfig Systems { get; private set; }
         public MissionProfile Mission { get; private set; }
+        public GroundControlScript GroundControl { get; private set; }
         public CockpitTheme Theme { get; private set; }
         public InteractionSettings Interaction { get; private set; }
         public EnvironmentConfig Environment { get; private set; }
@@ -59,10 +60,21 @@ namespace Phainon.EditorTools
             Vehicle = LoadOrCreate<VehicleConfig>(BuildPaths.Data + "/VehicleConfig.asset");
             Systems = LoadOrCreate<SystemsConfig>(BuildPaths.Data + "/SystemsConfig.asset");
             Mission = LoadOrCreate<MissionProfile>(BuildPaths.Data + "/MissionProfile.asset");
+            GroundControl = LoadOrCreate<GroundControlScript>(BuildPaths.Data + "/GroundControlScript.asset");
             Theme = LoadOrCreate<CockpitTheme>(BuildPaths.Data + "/CockpitTheme.asset");
             Interaction = LoadOrCreate<InteractionSettings>(BuildPaths.Data + "/InteractionSettings.asset");
             Environment = LoadOrCreate<EnvironmentConfig>(BuildPaths.Data + "/EnvironmentConfig.asset");
             Audio = LoadOrCreate<AudioLibrary>(BuildPaths.Data + "/AudioLibrary.asset");
+
+            // The specs are defined in code. Rewriting them is what carries new defaults into assets that already exist.
+            Vehicle.spec = new Phainon.Simulation.VehicleSpec();
+            Systems.spec = new Phainon.Simulation.SystemsSpec();
+            Mission.spec = new Phainon.Simulation.MissionSpec();
+            GroundControl.spec = new Phainon.Simulation.CommsScriptSpec();
+            EditorUtility.SetDirty(Vehicle);
+            EditorUtility.SetDirty(Systems);
+            EditorUtility.SetDirty(Mission);
+            EditorUtility.SetDirty(GroundControl);
 
             // The cockpit raycast must see controls and the panels that can block them, nothing else.
             Interaction.raycastMask = (1 << BuildPaths.LayerCockpit) | (1 << BuildPaths.LayerInteractable);

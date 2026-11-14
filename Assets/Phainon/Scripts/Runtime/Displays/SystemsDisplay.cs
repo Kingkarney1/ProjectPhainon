@@ -80,8 +80,10 @@ namespace Phainon.Displays
                 engine.ThrustLimit < engine.ThrottleCommand - 0.005 ? t.cautionAmber : t.textPrimary);
             chamberTemp.Set(engine.ChamberTemperatureK.ToString("0"));
 
-            SetFuel(boosterFuel, craft, 0, limits);
-            SetFuel(upperFuel, craft, 1, limits);
+            // Two gauges for three stages: they show the active stage and its neighbour.
+            int first = Mathf.Clamp(engine.ActiveStage, 0, Mathf.Max(0, craft.VehicleSpec.stages.Length - 2));
+            SetFuel(boosterFuel, craft, first, limits);
+            SetFuel(upperFuel, craft, first + 1, limits);
 
             float feed = (float)craft.Fuel.FeedPressure;
             feedPressure.Set(feed, craft.Fuel.FeedReady ? t.nominalGreen : t.cautionAmber, (feed * 100f).ToString("0") + "%");
@@ -90,6 +92,8 @@ namespace Phainon.Displays
         private void SetFuel(BarGauge gauge, Spacecraft craft, int stage, SystemsSpec limits)
         {
             CockpitTheme t = Theme;
+            if (stage >= craft.VehicleSpec.stages.Length) return;
+            gauge.SetLabel("FUEL  " + craft.VehicleSpec.stages[stage].name);
             if (stage < craft.Engine.ActiveStage)
             {
                 gauge.Set(0f, t.textDim, "JETTISONED");

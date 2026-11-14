@@ -103,6 +103,38 @@ Shader "Phainon/SpaceSky"
                 return dot(direction, direction) < 0.25 ? fallback : normalize(direction);
             }
 
+            // The atmosphere is a shell of fixed thickness, so its apparent width shrinks with the distance
+            // to the limb. 1546 km is that distance from the 185 km parking orbit, where the look was tuned.
+            float LimbScale(float tangentDistanceKm)
+            {
+                return min(1.0, 1546.0 / max(tangentDistanceKm, 1.0));
+            }
+
+            float Galaxy(float3 dir, float3 centre, float3 axisHint, float longRadius, float shortRadius)
+            {
+                float3 major = normalize(axisHint - centre * dot(axisHint, centre));
+                float3 minor = cross(centre, major);
+                float3 offset = dir - centre;
+                float u = dot(offset, major) / longRadius;
+                float v = dot(offset, minor) / shortRadius;
+                float r2 = u * u + v * v;
+                // A wide faint disc with a small bright core, only on the near side of the sky.
+                return step(0.9, dot(dir, centre)) * (exp(-r2) * 0.5 + exp(-r2 * 7.0) * 0.7);
+            }
+
+            // Faint nebulae and two small galaxies, fixed among the stars.
+            float3 DeepSky(float3 dir)
+            {
+                float mottle = 0.25 + 0.75 * Fbm3(dir * 9.0 + 4.0);
+                float3 color = float3(0.55, 0.16, 0.26) * pow(saturate(dot(dir, normalize(float3(-0.62, 0.31, 0.72)))), 60.0);
+                color += float3(0.14, 0.30, 0.55) * pow(saturate(dot(dir, normalize(float3(0.48, -0.55, -0.68)))), 90.0);
+                color += float3(0.30, 0.20, 0.50) * pow(saturate(dot(dir, normalize(float3(0.10, 0.80, -0.59)))), 140.0);
+                color *= mottle * 0.16;
+                color += float3(0.90, 0.85, 0.70) * Galaxy(dir, normalize(float3(0.74, 0.42, -0.52)), float3(0.2, 0.9, 0.1), 0.035, 0.012) * 0.12;
+                color += float3(0.70, 0.80, 1.00) * Galaxy(dir, normalize(float3(-0.30, -0.72, 0.62)), float3(0.9, 0.1, 0.4), 0.022, 0.009) * 0.12;
+                return color;
+            }
+
             float3 Stars(float3 dir)
             {
                 float3 color = 0.0;
@@ -159,13 +191,15 @@ Shader "Phainon/SpaceSky"
                 return result;
             }
 
-            float3 ShadeEarth(float3 viewDir, float3 up, float3 sun, float camRadius, float altitudeKm, float cosNadir)
+            float3 ShadeEarth(float3 viewDir, float3 up, float3 sun, float camRadius, float altitudeKm, float cosNadir, float sinNadir)
             {
                 // Ray-sphere intersection from the spacecraft. The numerically stable root is used
                 // because close to the ground the naive form subtracts two nearly equal numbers.
                 float b = -camRadius * cosNadir;
                 float c = altitudeKm * (2.0 * EARTH_RADIUS_KM + altitudeKm);
-                float disc = max(b * b - c, 0.0);
+                // b*b - c, written so it stays accurate when the Earth is a small disc a million km away.
+                float miss = camRadius * sinNadir;
+                float disc = max(EARTH_RADIUS_KM * EARTH_RADIUS_KM - miss * miss, 0.0);
                 float t = c / (-b + sqrt(disc));
 
                 float3 hit = up * camRadius + viewDir * t;
@@ -213,6 +247,8 @@ Shader "Phainon/SpaceSky"
                 // Night side: clustered city lights on land, hidden by cloud.
                 float land = 1.0 - ocean;
                 float cities = smoothstep(0.60, 0.88, ValueNoise3(nEarth * 240.0)) * smoothstep(0.45, 0.80, ValueNoise3(nEarth * 1700.0));
+                // Individual cities are far below one pixel from deep space, where they would only sparkle.
+                cities *= saturate(1.5 - footprintKm / 30.0);
                 float3 nightSide = float3(0.0015, 0.0025, 0.006) + float3(1.0, 0.72, 0.38) * (cities * land * (1.0 - cloud) * 0.55);
                 shaded = shaded * day + nightSide * (1.0 - day);
 
@@ -220,7 +256,9 @@ Shader "Phainon/SpaceSky"
                 // it thickens with distance, so the horizon dissolves into the sky colour.
                 float limbHaze = pow(1.0 - viewCos, 2.6) * 0.92;
                 float visibilityKm = lerp(14.0, 3200.0, saturate(altitudeKm / 90.0));
-                float distanceHaze = (1.0 - exp(-t / visibilityKm)) * (0.30 + 0.70 * _PhainonAtmosphere);
+                // Haze builds along the part of the sight line that is inside the air, not the empty space before it.
+                float airPathKm = min(t, 120.0 / max(viewCos, 0.05));
+                float distanceHaze = (1.0 - exp(-airPathKm / visibilityKm)) * (0.30 + 0.70 * _PhainonAtmosphere);
                 float haze = saturate(max(limbHaze, distanceHaze));
 
                 float3 hazeColor = _HazeColor.rgb * (0.04 + 0.96 * day);
@@ -240,7 +278,7 @@ Shader "Phainon/SpaceSky"
                 float tangentDistance = sqrt(max(camRadius * camRadius - EARTH_RADIUS_KM * EARTH_RADIUS_KM, 0.0));
                 float3 limbNormal = normalize(up * camRadius + viewDir * tangentDistance);
                 float limbLit = smoothstep(-0.14, 0.20, dot(limbNormal, sun));
-                float width = lerp(0.011, 0.24, sqrt(saturate(atmosphere)));
+                float width = lerp(0.011, 0.24, sqrt(saturate(atmosphere))) * LimbScale(tangentDistance);
                 float band = exp(-above / width);
                 float core = exp(-above / (width * 0.32));
                 float3 limb = lerp(_LimbColor.rgb, float3(0.80, 0.90, 1.0), core) * band * limbLit * lerp(1.5, 0.55, atmosphere);
@@ -281,7 +319,7 @@ Shader "Phainon/SpaceSky"
                 // The Milky Way: a faint, mottled band along one great circle of the star field.
                 float galacticLatitude = dot(inertialDir, normalize(float3(0.35, 0.86, 0.37)));
                 float milkyWay = exp(-galacticLatitude * galacticLatitude * 26.0) * (0.35 + 0.65 * Fbm3(inertialDir * 5.0 + 1.7));
-                float3 starField = Stars(inertialDir) + float3(0.55, 0.60, 0.75) * (milkyWay * 0.05);
+                float3 starField = Stars(inertialDir) + float3(0.55, 0.60, 0.75) * (milkyWay * 0.05) + DeepSky(inertialDir);
                 color += starField * (_StarBrightness * _PhainonStarVisibility * darkness);
                 return color;
             }
@@ -298,16 +336,19 @@ Shader "Phainon/SpaceSky"
                 // Angle of this pixel above the true (curved) horizon. Negative means it looks at the Earth.
                 float cosNadir = clamp(dot(viewDir, -up), -1.0, 1.0);
                 float limbAngle = asin(saturate(EARTH_RADIUS_KM / camRadius));
-                float above = acos(cosNadir) - limbAngle;
+                // atan2 of sine and cosine stays accurate looking almost straight at the Earth, where acos does not.
+                float sinNadir = length(cross(viewDir, up));
+                float above = atan2(sinNadir, cosNadir) - limbAngle;
 
                 float3 color;
                 if (above < 0.0)
                 {
-                    color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir);
+                    color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir, sinNadir);
 
                     // Blend the last sliver of surface into the atmosphere so the limb has no hard edge.
                     float3 skyAtLimb = ShadeSky(viewDir, up, sun, camRadius, 0.0, altitudeKm);
-                    color = lerp(color, max(color, skyAtLimb * 0.85), smoothstep(-0.006, 0.0, above));
+                    float tangentDistance = sqrt(max(camRadius * camRadius - EARTH_RADIUS_KM * EARTH_RADIUS_KM, 0.0));
+                    color = lerp(color, max(color, skyAtLimb * 0.85), smoothstep(-0.006 * LimbScale(tangentDistance), 0.0, above));
                 }
                 else
                 {

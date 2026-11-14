@@ -40,6 +40,7 @@ namespace Phainon.Environment
         private Quaternion shownAttitude;
         private bool hasAttitude;
         private float cloudTime;
+        private float earthshineNow;
 
         /// <summary>1 on the ground, falling to 0 in vacuum. Other effects use it to fade with the air.</summary>
         public float Atmosphere { get; private set; }
@@ -103,7 +104,16 @@ namespace Phainon.Environment
             float altitudeKm = (float)(flight.AltitudeMeters / 1000.0);
             Atmosphere = Mathf.Exp(-altitudeKm / Mathf.Max(0.1f, config.skyScaleHeightKm));
             float stars = Mathf.InverseLerp(config.starsStartAltitudeKm, config.starsFullAltitudeKm, altitudeKm);
-            Daylight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.22f, 0.18f, Vector3.Dot(up, sunDirection)));
+            // Sunlit unless the Sun is behind the Earth's disc. On the ground that disc is everything below
+            // the horizon; from deep space it is a small circle, so the craft is almost never in shadow.
+            float earthSine = (float)(FlightModel.EarthRadius / flight.Radius);
+            float earthAngle = Mathf.Asin(Mathf.Clamp01(earthSine));
+            float sunFromNadir = Vector3.Angle(sunDirection, -up) * Mathf.Deg2Rad;
+            // Dusk is soft through air and sharp in vacuum.
+            Daylight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(
+                earthAngle - Mathf.Lerp(0.10f, 0.22f, Atmosphere), earthAngle + Mathf.Lerp(0.06f, 0.18f, Atmosphere), sunFromNadir));
+            // Light reflected from Earth: how much of its disc is lit from here, and how much sky it fills.
+            earthshineNow = (0.5f + 0.5f * Vector3.Dot(up, sunDirection)) * earthSine * earthSine;
 
             cloudTime += Time.deltaTime * config.cloudDriftSpeed;
 
@@ -140,7 +150,7 @@ namespace Phainon.Environment
         private void UpdateAmbient(Vector3 up, Vector3 sunDirection)
         {
             Color sky = config.groundAmbient * (Atmosphere * Daylight);
-            Color space = config.spaceAmbient + config.earthshine * ((1f - Atmosphere) * Daylight);
+            Color space = config.spaceAmbient + config.earthshine * ((1f - Atmosphere) * earthshineNow);
             RenderSettings.ambientLight = sky + space;
         }
 

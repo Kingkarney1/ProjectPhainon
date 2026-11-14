@@ -37,6 +37,13 @@ namespace Phainon.Simulation
             return CommandResult.Ok("NAV SYSTEM ON - ALIGNING PLATFORM");
         }
 
+        /// <summary>A fault drops the platform out. The crew restart it with the NAV SYSTEM button.</summary>
+        public void Trip()
+        {
+            Enabled = false;
+            AlignmentProgress = 0.0;
+        }
+
         public void Tick(double dt, bool busPowered)
         {
             if (!busPowered) Enabled = false;

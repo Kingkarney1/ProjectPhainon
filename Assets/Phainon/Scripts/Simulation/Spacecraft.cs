@@ -17,7 +17,8 @@ namespace Phainon.Simulation
     /// </summary>
     public class Spacecraft
     {
-        public Spacecraft(VehicleSpec vehicleSpec, SystemsSpec systemsSpec, MissionSpec missionSpec)
+        /// <param name="faultSeed">Seed for this flight's random fault. Zero means nothing breaks unless injected.</param>
+        public Spacecraft(VehicleSpec vehicleSpec, SystemsSpec systemsSpec, MissionSpec missionSpec, CommsScriptSpec commsScript = null, int faultSeed = 0)
         {
             VehicleSpec = vehicleSpec;
             SystemsSpec = systemsSpec;
@@ -33,6 +34,8 @@ namespace Phainon.Simulation
             Attitude = new AttitudeController(vehicleSpec);
             Warnings = new WarningSystem();
             Mission = new MissionController(missionSpec, this);
+            Faults = new FaultSystem(this, faultSeed);
+            GroundControl = new GroundControl(commsScript, this);
 
             Engine.ShutDown += OnEngineShutDown;
             Engine.Ignited += OnEngineIgnited;
@@ -52,6 +55,8 @@ namespace Phainon.Simulation
         public AttitudeController Attitude { get; private set; }
         public WarningSystem Warnings { get; private set; }
         public MissionController Mission { get; private set; }
+        public FaultSystem Faults { get; private set; }
+        public GroundControl GroundControl { get; private set; }
 
         private bool flameoutLatched;
 
@@ -75,11 +80,14 @@ namespace Phainon.Simulation
             Engine.Tick(dt);
 
             double mass = Flight.ComputeMass(Engine.ActiveStage, Fuel);
-            Attitude.Tick(dt, Flight, Engine, Navigation.GuidanceActive, powered, Power.ApuOnline);
+            Attitude.Tick(dt, Flight, Engine, Navigation.GuidanceActive, Navigation.Mode == NavMode.Orbit, powered, Power.ApuOnline);
             Flight.Tick(dt, Engine.ThrustNewtons, mass, Attitude.PitchDegrees, Attitude.YawDegrees);
 
             Mission.PostTick(dt);
+            Faults.Tick(dt);
             EvaluateWarnings();
+            // The ground station is taken to be directly below, so the signal path is the altitude.
+            GroundControl.Tick(dt, Flight.AltitudeMeters);
         }
 
         private double ComputeElectricalLoad()
@@ -89,6 +97,7 @@ namespace Phainon.Simulation
             if (Comms.Enabled) load += SystemsSpec.commsLoadWatts;
             if (LifeSupport.Enabled) load += SystemsSpec.cabinLoadWatts;
             if (Fuel.PumpsEnabled) load += SystemsSpec.fuelPumpLoadWatts;
+            if (Power.BatteryAFaulted && Power.BatteryAEnabled) load += SystemsSpec.batteryFaultLoadWatts;
             return load;
         }
 
@@ -184,6 +193,27 @@ namespace Phainon.Simulation
             Attitude.RollInput = SimMath.Clamp(roll, -1.0, 1.0);
         }
 
+        // ---------------------------------------------------------------- time acceleration
+
+        /// <summary>Why time may not be accelerated right now, or null when it may.</summary>
+        public string TimeWarpInhibit
+        {
+            get
+            {
+                if (Mission.Phase != MissionPhase.OuterSpace) return "ONLY IN ORBIT OR BEYOND";
+                if (Engine.IsBurning || Engine.ThrustNewtons > 0.0) return "ENGINE RUNNING";
+                if (Warnings.MasterAlarmActive) return "MASTER ALARM";
+                if (GroundControl.AwaitingReply != null) return "GROUND CONTROL IS WAITING FOR A REPLY";
+                return null;
+            }
+        }
+
+        /// <summary>Highest sensible rate here: close to Earth the view would strobe at the top rates.</summary>
+        public int MaxTimeWarp
+        {
+            get { return Flight.AltitudeMeters < 2000000.0 ? 100 : (Flight.AltitudeMeters < 50000000.0 ? 1000 : 10000); }
+        }
+
         // ---------------------------------------------------------------- indicators
 
         /// <summary>State of a panel lamp. Lamps are dark whenever the main bus is unpowered.</summary>
@@ -210,10 +240,12 @@ namespace Phainon.Simulation
                 case IndicatorId.EngineIgnition:
                     if (Engine.IsBurning) return IndicatorState.On;
                     bool armed = Engine.ActiveStage == 0 ? Engine.IgnitionInterlockOpen : Mission.Phase != MissionPhase.Failed;
-                    return armed && Fuel.HasPropellant(Engine.ActiveStage) && Mission.Phase != MissionPhase.OuterSpace
+                    // In orbit the lamp only invites ignition once the service module is the active stage.
+                    return armed && Fuel.HasPropellant(Engine.ActiveStage) && (Mission.Phase != MissionPhase.OuterSpace || Engine.ActiveStage > 1)
                         ? IndicatorState.Blinking : IndicatorState.Off;
                 case IndicatorId.EngineCutoff:
-                    return Mission.OrbitGo && Engine.IsBurning ? IndicatorState.Blinking : IndicatorState.Off;
+                    bool cutoffDue = Mission.Phase == MissionPhase.OuterSpace ? Mission.HasEscaped : Mission.OrbitGo;
+                    return cutoffDue && Engine.IsBurning ? IndicatorState.Blinking : IndicatorState.Off;
                 case IndicatorId.StageSeparation:
                 case IndicatorId.StageSepReady:
                     return Mission.StageSeparationReady ? IndicatorState.Blinking : IndicatorState.Off;
@@ -285,6 +317,12 @@ namespace Phainon.Simulation
             Warnings.Set(WarningId.NavNotAligned, inFlight && powered && !Navigation.Aligned, WarningSeverity.Caution, "NAV PLATFORM NOT ALIGNED");
             Warnings.Set(WarningId.EngineFlameout, powered && flameoutLatched && ascending, WarningSeverity.Warning, "ENGINE FLAMEOUT");
             Warnings.Set(WarningId.StageSepRequired, powered && Mission.StageSeparationReady, WarningSeverity.Advisory, "STAGE SEPARATION REQUIRED");
+            Warnings.Set(WarningId.FeedPressureDropping, powered && Fuel.PumpFaulted && Fuel.PumpsEnabled,
+                WarningSeverity.Caution, "FEED PRESSURE DROPPING");
+            Warnings.Set(WarningId.BatteryFault, powered && Power.BatteryAFaulted && Power.BatteryAEnabled,
+                WarningSeverity.Caution, "BATT A FAULT - HIGH DRAIN");
+            Warnings.Set(WarningId.ThrustLow, powered && Engine.State == EngineState.Running && Engine.ThrustFactor < 0.97,
+                WarningSeverity.Caution, "ENGINE THRUST LOW");
             Warnings.Set(WarningId.TrajectoryLow,
                 powered && ascending && Flight.VerticalSpeed < -20.0 && Flight.AltitudeMeters < s.trajectoryLowAltitudeMeters,
                 WarningSeverity.Warning, "SINK RATE - TRAJECTORY LOW");

@@ -9,7 +9,9 @@ namespace Phainon.Simulation
     {
         BusPowerLoss, BatteryLow, ApuOffline, FuelLow, DynamicPressureHigh, HighG,
         CabinPressureLow, OxygenLow, CabinTempHigh, CommLoss, NavNotAligned,
-        EngineFlameout, StageSepRequired, TrajectoryLow
+        EngineFlameout, StageSepRequired, TrajectoryLow,
+        // Appended, never reordered: authored radio lines store these by number.
+        FeedPressureDropping, BatteryFault, ThrustLow
     }
 
     public class WarningEntry

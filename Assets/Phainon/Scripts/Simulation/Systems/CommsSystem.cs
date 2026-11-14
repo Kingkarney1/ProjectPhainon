@@ -12,6 +12,10 @@ namespace Phainon.Simulation
 
         public bool Enabled { get; private set; }
         public bool AntennaEnabled { get; set; }
+        /// <summary>Latched by a fault: the transmitter is dead until its switch is cycled.</summary>
+        public bool AntennaFaulted { get; private set; }
+
+        public void FaultAntenna() { AntennaFaulted = true; }
         public double AcquisitionProgress { get; private set; }
         public bool LinkEstablished { get { return AcquisitionProgress >= 1.0; } }
         /// <summary>Signal strength, 0..1.</summary>
@@ -37,7 +41,8 @@ namespace Phainon.Simulation
             if (!busPowered) Enabled = false;
 
             bool wasLinked = LinkEstablished;
-            bool acquiring = Enabled && AntennaEnabled;
+            if (!AntennaEnabled) AntennaFaulted = false;
+            bool acquiring = Enabled && AntennaEnabled && !AntennaFaulted;
             if (acquiring)
                 AcquisitionProgress = Math.Min(1.0, AcquisitionProgress + dt / Math.Max(0.1, spec.commsAcquireSeconds));
             else
@@ -48,6 +53,8 @@ namespace Phainon.Simulation
             if (LinkEstablished)
             {
                 double rangeLoss = SimMath.Clamp01(altitudeMeters / 2500000.0) * 0.25;
+                // Beyond low orbit the loss grows with each factor of ten in distance: about half strength at the Moon.
+                if (altitudeMeters > 2500000.0) rangeLoss += SimMath.Clamp01(Math.Log10(altitudeMeters / 2500000.0) / 3.0) * 0.35;
                 double plasmaLoss = SimMath.Clamp01(dynamicPressurePa / 40000.0) * 0.3;
                 double flutter = 0.02 * Math.Sin(clock * 1.7) + 0.015 * Math.Sin(clock * 4.3);
                 target = SimMath.Clamp01(0.96 - rangeLoss - plasmaLoss + flutter);

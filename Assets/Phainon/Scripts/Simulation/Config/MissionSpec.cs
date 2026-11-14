@@ -38,6 +38,8 @@ namespace Phainon.Simulation
         public double reentryFailAltitudeMeters = 60000;
         public double spaceBoundaryAltitudeMeters = 100000;
         public double maxQDetectMinPa = 8000;
+        /// <summary>Distances from Earth that are called out on the way out, in kilometres.</summary>
+        public double[] distanceMarksKm = { 10000, 100000, 384400, 1000000 };
 
         public PhaseInfo[] phases = DefaultPhases();
 
@@ -54,7 +56,7 @@ namespace Phainon.Simulation
                 new PhaseInfo(MissionPhase.OrbitalInsertion, "ORBITAL INSERTION",
                     "Burn to orbital velocity. Cut the engine when ORBIT GO illuminates."),
                 new PhaseInfo(MissionPhase.OuterSpace, "OUTER SPACE",
-                    "Stable orbit achieved. The spacecraft is yours: attitude and propulsion remain live."),
+                    "Stable orbit achieved. Stay, or drop the upper stage and burn the service module to leave Earth."),
                 new PhaseInfo(MissionPhase.Failed, "MISSION FAILED",
                     "The mission cannot continue. Restart from the pause menu.")
             };

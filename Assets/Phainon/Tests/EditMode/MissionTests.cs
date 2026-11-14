@@ -262,5 +262,115 @@ namespace Phainon.Tests
             Assert.IsFalse(pilot.Craft.Navigation.Aligned);
             Assert.IsFalse(pilot.Craft.Mission.AllGo);
         }
+
+        // ---------------------------------------------------------------- ground control
+
+        private static int IndexOfLine(GroundControl radio, string id)
+        {
+            for (int i = 0; i < radio.History.Count; i++)
+                if (radio.History[i].Source != null && radio.History[i].Source.id == id) return i;
+            return -1;
+        }
+
+        [Test]
+        public void GroundControl_IsNotHeard_UntilTheLinkIsUp()
+        {
+            var pilot = new MissionPilot();
+            GroundControl radio = pilot.Craft.GroundControl;
+            pilot.Set(ControlId.BatteryA, 1);
+            pilot.Set(ControlId.BatteryB, 1);
+            pilot.Press(ControlId.MainPower);
+            pilot.Press(ControlId.NavSystem);
+            pilot.Advance(12.0);
+            Assert.IsTrue(pilot.Craft.Navigation.Aligned);
+            Assert.AreEqual(0, radio.History.Count, "nothing can be heard with the radio off");
+
+            pilot.Set(ControlId.CommAntenna, 1);
+            pilot.Press(ControlId.Comms);
+            pilot.Advance(12.0);
+            Assert.AreEqual("comm_check", radio.History[0].Source.id, "the comm check comes first");
+            Assert.Greater(IndexOfLine(radio, "nav_aligned"), 0, "the call that was waiting for the link gets through");
+        }
+
+        [Test]
+        public void GroundControl_CallsTheFlight_InOrder_QuotingLiveTelemetry()
+        {
+            var pilot = new MissionPilot();
+            GroundControl radio = pilot.Craft.GroundControl;
+            string altitudeAtCall = null;
+            radio.MessageReceived += message =>
+            {
+                if (message.Source.id == "max_q")
+                    altitudeAtCall = (pilot.Craft.Flight.AltitudeMeters / 1000.0).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+            };
+
+            Assert.IsTrue(pilot.FlyFullMission());
+            pilot.Advance(10.0);
+
+            string[] expected = { "comm_check", "count_started", "ignition", "liftoff", "max_q", "booster_cutoff", "upper_ignition", "orbit" };
+            int last = -1;
+            foreach (string id in expected)
+            {
+                int at = IndexOfLine(radio, id);
+                Assert.Greater(at, last, "'" + id + "' is missing or out of order");
+                last = at;
+            }
+
+            var heard = new System.Collections.Generic.HashSet<CommsLine>();
+            foreach (CommsMessage message in radio.History)
+                Assert.IsTrue(heard.Add(message.Source), "'" + message.Source.id + "' was sent twice");
+
+            StringAssert.Contains("at " + altitudeAtCall + " kilometres", radio.History[IndexOfLine(radio, "max_q")].Text);
+            // This pilot starts the count the instant the board is green, before Flight can speak.
+            Assert.Less(IndexOfLine(radio, "go_poll"), 0, "ground does not ask for a launch sequence that is already running");
+            Assert.IsTrue(radio.HasFlag("comm_check_no_reply"), "an unanswered question is remembered");
+            Assert.IsNull(radio.History[IndexOfLine(radio, "orbit")].Source.requiresFlag, "a silent crew gets the plain orbit call");
+        }
+
+        [Test]
+        public void AReply_SetsAFlag_ThatChangesALaterCall()
+        {
+            var pilot = new MissionPilot();
+            GroundControl radio = pilot.Craft.GroundControl;
+            Assert.IsFalse(radio.Reply(0).Accepted, "there is nothing to answer yet");
+
+            pilot.PowerUp();
+            Assert.IsTrue(pilot.RunUntil(() => radio.AwaitingReply != null, 15.0));
+            Assert.IsFalse(radio.Reply(5).Accepted);
+            Assert.IsTrue(radio.Reply(0).Accepted);
+            Assert.IsNull(radio.AwaitingReply);
+            Assert.IsTrue(radio.HasFlag("crew_talkative"));
+            Assert.AreEqual(CommsDirection.Outgoing, radio.History[radio.History.Count - 1].Direction);
+
+            pilot.Advance(10.0);
+            Assert.Greater(IndexOfLine(radio, "comm_check_ack"), 0, "ground answers the reply");
+            Assert.Greater(IndexOfLine(radio, "go_poll"), 0, "with the count not yet started, Flight gives the go");
+
+            Assert.IsTrue(pilot.Launch() && pilot.FlyToOrbit());
+            pilot.Advance(10.0);
+            Assert.AreEqual("crew_talkative", radio.History[IndexOfLine(radio, "orbit")].Source.requiresFlag,
+                "the orbit call is the variant for a crew that answered on the pad");
+        }
+
+        [Test]
+        public void Transmissions_TakeLightTime_ToArrive()
+        {
+            var script = new CommsScriptSpec
+            {
+                lines = new[] { new CommsLine("far", "flight", CommsTrigger.CountdownStarted, 0.0, "Do you copy?") }
+            };
+            var pilot = new MissionPilot(new Spacecraft(new VehicleSpec(), new SystemsSpec(), new MissionSpec(), script));
+            GroundControl radio = pilot.Craft.GroundControl;
+            pilot.PowerUp();
+            Assert.IsTrue(pilot.Press(ControlId.LaunchSequence).Accepted);
+
+            // Drive the radio alone, with the ground station ten light-seconds away.
+            double distance = 10.0 * GroundControl.SpeedOfLight;
+            for (int i = 0; i < 9; i++) radio.Tick(1.0, distance);
+            Assert.AreEqual(0, radio.History.Count, "the signal is still on its way");
+            for (int i = 0; i < 3; i++) radio.Tick(1.0, distance);
+            Assert.AreEqual(1, radio.History.Count);
+            Assert.AreEqual(10.0, radio.LightDelaySeconds, 1e-9);
+        }
     }
 }

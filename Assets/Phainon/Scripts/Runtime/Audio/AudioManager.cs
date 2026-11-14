@@ -55,6 +55,7 @@ namespace Phainon.Audio
             craft.Mission.CountdownTick += seconds => { if (seconds <= 10) Play(library.countdownBeep); };
             craft.Mission.Completed += () => Play(library.missionComplete);
             craft.Mission.Failed += reason => Play(library.missionFailed);
+            craft.GroundControl.MessageReceived += message => Play(library.notification);
             craft.Warnings.Raised += OnWarningRaised;
 
             router.ControlSound += OnControlSound;

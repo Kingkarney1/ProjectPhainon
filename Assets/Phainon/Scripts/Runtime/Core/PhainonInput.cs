@@ -24,6 +24,10 @@ namespace Phainon
         public readonly InputAction Yaw;
         public readonly InputAction Roll;
         public readonly InputAction[] ViewPresets;
+        public readonly InputAction[] Replies;
+        public readonly InputAction ToggleCommsLog;
+        public readonly InputAction TimeFaster;
+        public readonly InputAction TimeSlower;
 
         private readonly InputActionMap map = new InputActionMap("Cockpit");
 
@@ -55,6 +59,14 @@ namespace Phainon
             ViewPresets = new InputAction[6];
             for (int i = 0; i < ViewPresets.Length; i++)
                 ViewPresets[i] = map.AddAction("View" + (i + 1), InputActionType.Button, "<Keyboard>/" + (i + 1));
+
+            // Radio replies sit on the number keys after the view presets.
+            Replies = new InputAction[3];
+            for (int i = 0; i < Replies.Length; i++)
+                Replies[i] = map.AddAction("Reply" + (i + 1), InputActionType.Button, "<Keyboard>/" + (i + 7));
+            ToggleCommsLog = map.AddAction("ToggleCommsLog", InputActionType.Button, "<Keyboard>/c");
+            TimeFaster = map.AddAction("TimeFaster", InputActionType.Button, "<Keyboard>/period");
+            TimeSlower = map.AddAction("TimeSlower", InputActionType.Button, "<Keyboard>/comma");
         }
 
         public void Enable() { map.Enable(); }
