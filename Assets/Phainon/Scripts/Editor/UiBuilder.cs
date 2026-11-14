@@ -1,0 +1,297 @@
+using Phainon.Cockpit;
+using Phainon.UI;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
+
+namespace Phainon.EditorTools
+{
+    /// <summary>
+    /// Builds the screen-space interface: the in-flight HUD and the menus. Both share one overlay
+    /// canvas authored at 1920 x 1080 and scaled to the window.
+    /// </summary>
+    public class UiBuilder
+    {
+        public HudController Hud { get; private set; }
+        public MenuController Menus { get; private set; }
+
+        private readonly AssetFactory assets;
+        private readonly UiKit ui;
+        private readonly CockpitTheme theme;
+        private RectTransform canvasRect;
+
+        private static readonly Color PanelColor = new Color(0.03f, 0.045f, 0.06f, 0.88f);
+
+        public UiBuilder(AssetFactory assets)
+        {
+            this.assets = assets;
+            ui = new UiKit(assets);
+            theme = assets.Theme;
+        }
+
+        public void Build(SpacecraftController spacecraft, GameManager game, CockpitInteractionManager interaction,
+            CockpitControlRouter router, CockpitCameraController cockpitCamera)
+        {
+            var canvasObject = new GameObject("Interface Canvas", typeof(RectTransform));
+            canvasObject.layer = LayerMask.NameToLayer("UI");
+            canvasRect = (RectTransform)canvasObject.transform;
+
+            var canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 10;
+            var scaler = canvasObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 1f;
+            canvasObject.AddComponent<GraphicRaycaster>();
+
+            var eventSystem = new GameObject("EventSystem");
+            eventSystem.AddComponent<EventSystem>();
+            eventSystem.AddComponent<InputSystemUIInputModule>();
+
+            BuildHud(spacecraft, game, interaction, router, cockpitCamera);
+            BuildMenus(spacecraft, game);
+        }
+
+        /// <summary>A rect pinned to a point of its parent (anchor) by its own pivot, offset in pixels.</summary>
+        private RectTransform Pinned(string name, Transform parent, Vector2 anchor, Vector2 pivot, Vector2 offset, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.layer = parent.gameObject.layer;
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = pivot;
+            rect.anchoredPosition = offset;
+            rect.sizeDelta = size;
+            return rect;
+        }
+
+        // ---------------------------------------------------------------- HUD
+
+        private void BuildHud(SpacecraftController spacecraft, GameManager game, CockpitInteractionManager interaction,
+            CockpitControlRouter router, CockpitCameraController cockpitCamera)
+        {
+            RectTransform root = ui.Fill("HUD", canvasRect);
+            var group = root.gameObject.AddComponent<CanvasGroup>();
+            group.blocksRaycasts = false;
+            group.interactable = false;
+
+            Hud = root.gameObject.AddComponent<HudController>();
+            Hud.spacecraft = spacecraft;
+            Hud.game = game;
+            Hud.interaction = interaction;
+            Hud.router = router;
+            Hud.cockpitCamera = cockpitCamera;
+            Hud.theme = theme;
+            Hud.root = group;
+
+            // Objective guide, top left.
+            RectTransform guide = Pinned("Objective Guide", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -28f), new Vector2(600f, 168f));
+            ui.Image(guide, PanelColor, assets.RoundedPanel, true);
+            ui.Image("Accent", guide, 0f, 18f, 4f, 132f, theme.accentBlue);
+            Hud.phaseTitle = ui.Text("Phase", guide, 22f, 12f, 380f, 30f, "PRE-LAUNCH", 23f, theme.accentBlue, TextAlignmentOptions.Left, FontStyles.Bold);
+            Hud.clockText = ui.Text("Clock", guide, 380f, 12f, 200f, 30f, "T-00:00:15", 22f, theme.nominalGreen, TextAlignmentOptions.Right, FontStyles.Bold);
+            Hud.objectiveText = ui.Text("Objective", guide, 22f, 48f, 558f, 84f, "", 20f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+            ui.Text("Hint", guide, 22f, 138f, 558f, 22f, "The next control pulses amber.   H hides this guide.", 14f, theme.textDim, TextAlignmentOptions.Left);
+            Hud.guidePanel = guide.gameObject;
+
+            // Notifications, top centre.
+            Hud.toastRows = new TMP_Text[4];
+            for (int i = 0; i < Hud.toastRows.Length; i++)
+            {
+                RectTransform row = Pinned("Notification " + i, root, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -30f - i * 34f), new Vector2(900f, 32f));
+                Hud.toastRows[i] = ui.Text(row, "", 22f, theme.accentBlue, TextAlignmentOptions.Center, FontStyles.Bold);
+            }
+
+            // Warning banner under the notifications.
+            RectTransform warning = Pinned("Warning Banner", root, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -178f), new Vector2(720f, 78f));
+            Hud.warningGroup = warning.gameObject.AddComponent<CanvasGroup>();
+            Hud.warningGroup.alpha = 0f;
+            Hud.warningBackground = ui.Image(warning, theme.warningRed, assets.RoundedPanel, true);
+            Hud.warningText = ui.Text(ui.Fill("Text", warning, 8f), "", 26f, Color.white, TextAlignmentOptions.Center, FontStyles.Bold);
+
+            // Interaction prompt, bottom centre.
+            RectTransform prompt = Pinned("Interaction Prompt", root, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 120f), new Vector2(620f, 84f));
+            Hud.promptGroup = prompt.gameObject.AddComponent<CanvasGroup>();
+            Hud.promptGroup.alpha = 0f;
+            ui.Image(prompt, PanelColor, assets.RoundedPanel, true);
+            Hud.promptTitle = ui.Text("Control", prompt, 20f, 10f, 580f, 34f, "", 24f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            Hud.promptAction = ui.Text("Action", prompt, 20f, 46f, 580f, 28f, "", 18f, theme.textDim, TextAlignmentOptions.Center);
+
+            // Centre reticle, shown while looking around.
+            RectTransform reticle = Pinned("Reticle", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10f, 10f));
+            Hud.reticle = ui.Image(reticle, theme.textDim, assets.Ring);
+            Hud.reticle.enabled = false;
+
+            // Key reminder, bottom left.
+            RectTransform keys = Pinned("Key Reminder", root, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28f, 22f), new Vector2(1300f, 26f));
+            ui.Text(keys, "RMB look    LMB operate    Scroll adjust    1-6 views    Z zoom    Shift / Ctrl throttle    W S A D Q E attitude    Esc pause",
+                15f, new Color(theme.textDim.r, theme.textDim.g, theme.textDim.b, 0.8f), TextAlignmentOptions.Left);
+        }
+
+        // ---------------------------------------------------------------- menus
+
+        private void BuildMenus(SpacecraftController spacecraft, GameManager game)
+        {
+            RectTransform root = ui.Fill("Menus", canvasRect);
+            Menus = root.gameObject.AddComponent<MenuController>();
+            Menus.game = game;
+            Menus.spacecraft = spacecraft;
+
+            RectTransform backdrop = ui.Fill("Backdrop", root);
+            Image shade = ui.Image(backdrop, Color.black);
+            shade.raycastTarget = true;
+            Menus.backdrop = backdrop.gameObject.AddComponent<CanvasGroup>();
+            Menus.backdrop.alpha = 1f;
+
+            BuildMainMenu(root);
+            BuildBriefing(root);
+            BuildPause(root);
+            BuildComplete(root);
+            BuildFailed(root);
+        }
+
+        private void BuildMainMenu(RectTransform root)
+        {
+            RectTransform panel = ui.Fill("Main Menu", root);
+            Menus.mainMenuPanel = panel.gameObject;
+
+            RectTransform block = Pinned("Title Block", panel, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(150f, 40f), new Vector2(1100f, 620f));
+            ui.Text("Programme", block, 0f, 0f, 1100f, 32f, "PHAINON FLIGHT SYSTEMS", 22f, theme.textDim, TextAlignmentOptions.Left, FontStyles.Bold).characterSpacing = 18f;
+            ui.Text("Title", block, 0f, 46f, 1100f, 110f, assets.Mission.spec.missionName, 96f, theme.textPrimary, TextAlignmentOptions.Left, FontStyles.Bold);
+            ui.Text("Subtitle", block, 4f, 164f, 1100f, 44f, assets.Mission.spec.missionSubtitle, 34f, theme.accentBlue, TextAlignmentOptions.Left, FontStyles.Bold).characterSpacing = 22f;
+            ui.Image("Rule", block, 4f, 226f, 520f, 3f, theme.accentBlue);
+            ui.Text("Blurb", block, 4f, 246f, 760f, 96f,
+                "Take the command seat. Bring the spacecraft to life, fly it off the pad, through staging and into orbit.",
+                24f, theme.textDim, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+
+            Menus.startButton = MenuButton(block, 4f, 372f, 420f, "START MISSION", true);
+            Menus.quitButton = MenuButton(block, 4f, 452f, 420f, "QUIT", false);
+
+            RectTransform footer = Pinned("Footer", panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(154f, 48f), new Vector2(1200f, 26f));
+            ui.Text(footer, "VERTICAL SLICE  " + Application.version + "    A fictional spacecraft. Not affiliated with any space agency.",
+                16f, theme.textDim, TextAlignmentOptions.Left);
+        }
+
+        private void BuildBriefing(RectTransform root)
+        {
+            RectTransform panel = Pinned("Briefing", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500f, 900f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.briefingPanel = panel.gameObject;
+
+            ui.Text("Heading", panel, 50f, 34f, 900f, 50f, "MISSION BRIEFING", 40f, theme.textPrimary, TextAlignmentOptions.Left, FontStyles.Bold);
+            ui.Image("Rule", panel, 50f, 92f, 1400f, 2f, theme.accentBlue);
+
+            const string flow =
+                "<color=#45A8FF><b>1  PRE-LAUNCH</b></color>\n" +
+                "Switch on both batteries on the overhead panel (key 6), press MAIN POWER, then bring every row of the GO / NO-GO board on the centre display to GO. " +
+                "Press LAUNCH SEQ to start the count.\n\n" +
+                "<color=#45A8FF><b>2  ATMOSPHERIC ASCENT</b></color>\n" +
+                "Set full throttle. At T-6 lift the guard and press ENGINE IGNITION. Ease the throttle back through max-Q " +
+                "and again if the G load climbs past 4.\n\n" +
+                "<color=#45A8FF><b>3  STAGE SEPARATION</b></color>\n" +
+                "When the booster burns out, lift the guard and press STAGE SEP, then press ENGINE IGNITION for the upper stage.\n\n" +
+                "<color=#45A8FF><b>4  ORBITAL INSERTION</b></color>\n" +
+                "Hold the burn. When ORBIT GO lights, press ENGINE CUTOFF.\n\n" +
+                "<color=#45A8FF><b>5  OUTER SPACE</b></color>\n" +
+                "You are in orbit. Switch GUIDANCE off and RCS on to fly the spacecraft by hand.";
+            ui.Text("Flow", panel, 50f, 112f, 660f, 680f, flow, 21f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+
+            ui.Image("Divider", panel, 748f, 112f, 2f, 660f, theme.panelOutline);
+
+            const string guide =
+                "<color=#45A8FF><b>COCKPIT CONTROLS</b></color>\n" +
+                "<b>Look around</b>   hold the right mouse button and move the mouse\n" +
+                "<b>Jump to a view</b>   1 window   2 displays   3 main panel   4 left console   5 right console   6 overhead\n" +
+                "<b>Zoom</b>   hold Z or the middle mouse button\n\n" +
+                "<b>Buttons</b>   point and left-click. Red-framed buttons are guarded: the first click lifts the guard, the second presses.\n" +
+                "<b>Switches</b>   left-click to flip. The lamp above shows the state.\n" +
+                "<b>Dials</b>   hold left-click and drag, or point and scroll the wheel.\n" +
+                "<b>Throttle</b>   drag the lever on the left console, scroll over it, or use Shift and Ctrl. T is full, X is idle.\n" +
+                "<b>Attitude</b>   W S pitch, A D yaw, Q E roll (guidance off, RCS on).\n\n" +
+                "<color=#45A8FF><b>THE THREE DISPLAYS</b></color>\n" +
+                "<b>Left</b>   flight and navigation: altitude, velocity, attitude, trajectory.\n" +
+                "<b>Centre</b>   systems: engine, fuel, power, cabin, launch status and alerts.\n" +
+                "<b>Right</b>   hull camera, current objective and the flight-event timeline.\n\n" +
+                "The control you need next pulses amber, and the objective is shown top left. Esc pauses.";
+            ui.Text("Guide", panel, 780f, 112f, 670f, 680f, guide, 20f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+
+            Menus.briefingBackButton = MenuButton(panel, 50f, 808f, 300f, "BACK", false);
+            Menus.beginButton = MenuButton(panel, 1070f, 808f, 380f, "BEGIN MISSION", true);
+        }
+
+        private void BuildPause(RectTransform root)
+        {
+            RectTransform panel = Pinned("Pause", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 640f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.pausePanel = panel.gameObject;
+
+            ui.Text("Heading", panel, 0f, 40f, 620f, 50f, "MISSION PAUSED", 38f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Image("Rule", panel, 110f, 100f, 400f, 2f, theme.accentBlue);
+            Menus.resumeButton = MenuButton(panel, 110f, 132f, 400f, "RESUME", true);
+            Menus.pauseRestartButton = MenuButton(panel, 110f, 212f, 400f, "RESTART MISSION", false);
+            Menus.pauseMenuButton = MenuButton(panel, 110f, 292f, 400f, "MAIN MENU", false);
+            Menus.pauseQuitButton = MenuButton(panel, 110f, 372f, 400f, "QUIT", false);
+            ui.Text("Reminder", panel, 60f, 462f, 500f, 150f,
+                "RMB look   LMB operate   Scroll adjust\n1-6 views   Z zoom   H guide\nShift / Ctrl throttle   T full   X idle\nW S A D Q E attitude",
+                17f, theme.textDim, TextAlignmentOptions.Top, FontStyles.Normal, true);
+        }
+
+        private void BuildComplete(RectTransform root)
+        {
+            RectTransform panel = Pinned("Mission Complete", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 640f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.completePanel = panel.gameObject;
+
+            ui.Text("Heading", panel, 0f, 40f, 820f, 60f, "ORBIT ACHIEVED", 52f, theme.nominalGreen, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Text("Sub", panel, 0f, 104f, 820f, 34f, "MISSION COMPLETE   WELCOME TO OUTER SPACE", 22f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Image("Rule", panel, 160f, 152f, 500f, 2f, theme.nominalGreen);
+            Menus.completeSummary = ui.Text("Summary", panel, 150f, 176f, 520f, 150f, "", 22f, theme.textPrimary, TextAlignmentOptions.TopLeft);
+            ui.Text("Note", panel, 110f, 330f, 600f, 56f,
+                "The spacecraft is still live. Continue to fly it from the command seat.", 18f, theme.textDim, TextAlignmentOptions.Center, FontStyles.Normal, true);
+            Menus.continueButton = MenuButton(panel, 210f, 396f, 400f, "CONTINUE FLIGHT", true);
+            Menus.completeRestartButton = MenuButton(panel, 210f, 470f, 400f, "RESTART MISSION", false);
+            Menus.completeMenuButton = MenuButton(panel, 210f, 544f, 400f, "MAIN MENU", false);
+        }
+
+        private void BuildFailed(RectTransform root)
+        {
+            RectTransform panel = Pinned("Mission Failed", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 500f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.failedPanel = panel.gameObject;
+
+            ui.Text("Heading", panel, 0f, 40f, 820f, 60f, "MISSION FAILED", 52f, theme.warningRed, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Image("Rule", panel, 160f, 112f, 500f, 2f, theme.warningRed);
+            Menus.failedReason = ui.Text("Reason", panel, 90f, 136f, 640f, 120f, "", 23f, theme.textPrimary, TextAlignmentOptions.Top, FontStyles.Normal, true);
+            Menus.failedRestartButton = MenuButton(panel, 210f, 290f, 400f, "RESTART MISSION", true);
+            Menus.failedMenuButton = MenuButton(panel, 210f, 370f, 400f, "MAIN MENU", false);
+        }
+
+        private Button MenuButton(Transform parent, float x, float y, float width, string label, bool primary)
+        {
+            RectTransform rect = ui.Rect("Button " + label, parent, x, y, width, 62f);
+            Color baseColor = primary ? new Color(0.10f, 0.34f, 0.62f, 1f) : new Color(0.10f, 0.14f, 0.18f, 1f);
+            Image image = ui.Image(rect, Color.white, assets.RoundedPanel, true);
+            image.raycastTarget = true;
+
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            ColorBlock colors = button.colors;
+            colors.normalColor = baseColor;
+            colors.highlightedColor = Color.Lerp(baseColor, theme.accentBlue, 0.55f);
+            colors.selectedColor = Color.Lerp(baseColor, theme.accentBlue, 0.35f);
+            colors.pressedColor = theme.accentBlue;
+            colors.disabledColor = new Color(0.1f, 0.1f, 0.1f, 0.5f);
+            colors.fadeDuration = 0.08f;
+            button.colors = colors;
+
+            TextMeshProUGUI text = ui.Text(ui.Fill("Label", rect), label, 24f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            text.characterSpacing = 6f;
+            return button;
+        }
+    }
+}

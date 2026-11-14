@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 768810ade94dc2542b4aa9fc8963e32a, type: 3}
+  m_Name: InteractionSettings
+  m_EditorClassIdentifier: Phainon.Runtime::Phainon.InteractionSettings
+  reachDistance: 2.2
+  raycastMask:
+    serializedVersion: 2
+    m_Bits: 192
+  dialDragSensitivity: 0.0035
+  dialScrollStep: 0.05
+  leverDragSensitivity: 0.004
+  leverScrollStep: 0.05
+  throttleKeyRate: 0.45
+  guardAutoCloseSeconds: 6
+  hoverEmission: {r: 0.1, g: 0.32, b: 0.55, a: 1}
+  suggestEmission: {r: 0.55, g: 0.36, b: 0.04, a: 1}
+  suggestPulseHz: 1.4
+  lookSensitivity: 0.11
+  yawLimit: 120
+  pitchUpLimit: 70
+  pitchDownLimit: 72
+  defaultFov: 66
+  zoomFov: 30
+  zoomSpeed: 9
+  viewSnapSpeed: 5
+  maxShakeDegrees: 0.9
+  maxShakeMetres: 0.012
+  shakeFrequency: 21

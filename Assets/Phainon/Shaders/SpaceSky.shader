@@ -1,0 +1,323 @@
+// The whole view outside the spacecraft in one pass: sky, atmosphere, Earth, stars, Sun and Moon.
+//
+// It is drawn on a large inside-out sphere before everything else. The Earth is not a mesh: each
+// pixel intersects its view ray with a sphere of Earth's radius, which gives a perfectly smooth
+// limb and the correct curvature at any altitude, from the launch pad to orbit. The script
+// EnvironmentDirector feeds it the spacecraft's altitude and orientation through global properties.
+Shader "Phainon/SpaceSky"
+{
+    Properties
+    {
+        _EarthDayTex ("Earth Day Map (equirectangular)", 2D) = "black" {}
+        [Toggle] _HasEarthTex ("Use Day Map", Float) = 0
+        _CloudCoverage ("Cloud Coverage", Range(0, 1)) = 0.52
+        _StarBrightness ("Star Brightness", Range(0, 4)) = 1.4
+        _SunIntensity ("Sun Disc Intensity", Range(0, 80)) = 30
+        _ZenithColor ("Sky Zenith Colour", Color) = (0.07, 0.20, 0.58, 1)
+        _HorizonColor ("Sky Horizon Colour", Color) = (0.56, 0.74, 0.95, 1)
+        _LimbColor ("Atmosphere Limb Colour", Color) = (0.20, 0.45, 1.0, 1)
+        _HazeColor ("Surface Haze Colour", Color) = (0.50, 0.68, 0.95, 1)
+    }
+
+    SubShader
+    {
+        Tags { "RenderPipeline" = "UniversalPipeline" "Queue" = "Background" "RenderType" = "Background" "IgnoreProjector" = "True" }
+
+        Pass
+        {
+            Name "SpaceSky"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            Cull Front
+            ZWrite Off
+            ZTest LEqual
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma target 3.5
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "PhainonNoise.hlsl"
+
+            TEXTURE2D(_EarthDayTex);
+            SAMPLER(sampler_EarthDayTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _EarthDayTex_ST;
+                float _HasEarthTex;
+                float _CloudCoverage;
+                float _StarBrightness;
+                float _SunIntensity;
+                float4 _ZenithColor;
+                float4 _HorizonColor;
+                float4 _LimbColor;
+                float4 _HazeColor;
+            CBUFFER_END
+
+            // Set every frame by EnvironmentDirector.
+            float3 _PhainonSunDir;          // world space, towards the Sun
+            float3 _PhainonUpDir;           // world space, local vertical at the spacecraft
+            float3 _PhainonMoonDir;         // world space, towards the Moon
+            float _PhainonAltitudeKm;
+            float _PhainonAtmosphere;       // 1 on the ground, 0 in vacuum
+            float _PhainonStarVisibility;   // 0 in daylight sky, 1 in space
+            float _PhainonCloudTime;
+            float4x4 _PhainonWorldToEarth;      // rotation from world space to Earth-fixed axes
+            float4x4 _PhainonWorldToInertial;   // rotation from world space to the star field
+
+            static const float EARTH_RADIUS_KM = 6371.0;
+            static const float PI_F = 3.14159265;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float3 viewDirWS : TEXCOORD0;
+            };
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings output;
+                VertexPositionInputs vertex = GetVertexPositionInputs(input.positionOS.xyz);
+                output.positionCS = vertex.positionCS;
+                output.viewDirWS = vertex.positionWS - GetCameraPositionWS();
+                return output;
+            }
+
+            // The global properties are only set while the game is running. In the editor's Scene view
+            // they are zero, so rotations fall back to identity and directions to sensible defaults.
+            float3x3 RotationOrIdentity(float4x4 m)
+            {
+                float3x3 r = (float3x3)m;
+                if (dot(r[0], r[0]) < 0.25) r = float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+                return r;
+            }
+
+            float3 DirectionOr(float3 direction, float3 fallback)
+            {
+                return dot(direction, direction) < 0.25 ? fallback : normalize(direction);
+            }
+
+            float3 Stars(float3 dir)
+            {
+                float3 color = 0.0;
+                for (int layer = 0; layer < 2; layer++)
+                {
+                    float scale = layer == 0 ? 85.0 : 170.0;
+                    float threshold = layer == 0 ? 0.93 : 0.955;
+                    float3 p = dir * scale;
+                    float3 cell = floor(p);
+                    float3 local = frac(p) - 0.5;
+                    float3 rnd = Hash33(cell);
+
+                    float present = step(threshold, rnd.x);
+                    float3 offset = (Hash33(cell + 7.0) - 0.5) * 0.55;
+                    float size = lerp(0.07, 0.15, rnd.y * rnd.y);
+                    float falloff = smoothstep(size, 0.0, length(local - offset));
+                    float brightness = lerp(0.18, 1.8, pow(rnd.z, 5.0));
+                    float3 tint = lerp(float3(0.72, 0.84, 1.0), float3(1.0, 0.90, 0.74), rnd.y);
+                    color += falloff * brightness * tint * present;
+                }
+                return color;
+            }
+
+            // Fallback surface used when no day map is assigned: noise continents, deserts and ice caps.
+            float3 ProceduralSurface(float3 n)
+            {
+                float continents = Fbm3(n * 2.1 + 4.0);
+                float land = smoothstep(0.50, 0.55, continents);
+                float dryness = Fbm3(n * 5.0 + 9.0);
+                float3 ocean = lerp(float3(0.010, 0.035, 0.12), float3(0.02, 0.08, 0.20), smoothstep(0.38, 0.50, continents));
+                float3 ground = lerp(float3(0.06, 0.13, 0.04), float3(0.30, 0.24, 0.14), smoothstep(0.42, 0.62, dryness));
+                float3 terrainColor = lerp(ocean, ground, land);
+                float ice = smoothstep(0.80, 0.90, abs(n.y) + (dryness - 0.5) * 0.12);
+                return lerp(terrainColor, float3(0.85, 0.88, 0.92), ice);
+            }
+
+            float3 SampleSurface(float3 n, float lod)
+            {
+                // One exit point with the result assigned on both paths: some compilers warn about a
+                // return inside a branch, and an if/else skips the unused path's work.
+                float3 result;
+                if (_HasEarthTex < 0.5)
+                {
+                    result = ProceduralSurface(n);
+                }
+                else
+                {
+                    float u = atan2(n.z, n.x) / (2.0 * PI_F) + 0.5;
+                    float v = asin(clamp(n.y, -1.0, 1.0)) / PI_F + 0.5;
+                    // The mip level is chosen explicitly. Screen-space derivatives would be wrong along
+                    // the longitude seam, where u jumps from 1 back to 0.
+                    result = SAMPLE_TEXTURE2D_LOD(_EarthDayTex, sampler_EarthDayTex, float2(u, v), lod).rgb;
+                }
+                return result;
+            }
+
+            float3 ShadeEarth(float3 viewDir, float3 up, float3 sun, float camRadius, float altitudeKm, float cosNadir)
+            {
+                // Ray-sphere intersection from the spacecraft. The numerically stable root is used
+                // because close to the ground the naive form subtracts two nearly equal numbers.
+                float b = -camRadius * cosNadir;
+                float c = altitudeKm * (2.0 * EARTH_RADIUS_KM + altitudeKm);
+                float disc = max(b * b - c, 0.0);
+                float t = c / (-b + sqrt(disc));
+
+                float3 hit = up * camRadius + viewDir * t;
+                float3 n = normalize(hit);
+                float3 nEarth = normalize(mul(RotationOrIdentity(_PhainonWorldToEarth), n));
+
+                // Surface distance covered by one pixel, compared with the day map's texel size at the
+                // equator (about 19.5 km for a 2048-wide map), gives the mip level to read.
+                float viewCos = saturate(dot(n, -viewDir));
+                float footprintKm = t * 0.0011 / max(viewCos, 0.03);
+                float lod = log2(max(footprintKm / 19.5, 1.0));
+
+                float3 albedo = SampleSurface(nEarth, lod);
+                float ocean = saturate((albedo.b - max(albedo.r, albedo.g)) * 8.0 + 0.15);
+
+                // Extra ground detail fades in at low altitude, where the day map alone would look soft.
+                float lowAltitude = saturate(1.0 - altitudeKm / 140.0);
+                float detail = ValueNoise3(nEarth * 1400.0) * 0.6 + ValueNoise3(nEarth * 5200.0) * 0.4;
+                albedo *= lerp(1.0, 0.72 + 0.56 * detail, lowAltitude * 0.7);
+
+                // Cloud deck: warped fractal noise with a soft coverage threshold.
+                float3 drift = float3(_PhainonCloudTime * 0.004, 0.0, _PhainonCloudTime * 0.002);
+                float3 warp = float3(ValueNoise3(nEarth * 3.0 + 2.0), ValueNoise3(nEarth * 3.0 + 9.0), ValueNoise3(nEarth * 3.0 + 5.0)) - 0.5;
+                float cloudBase = Fbm3(nEarth * 5.5 + warp * 1.4 + drift);
+                float cloudFine = ValueNoise3(nEarth * 46.0 + drift * 4.0);
+                float threshold = lerp(0.72, 0.38, _CloudCoverage);
+                float cloud = smoothstep(threshold, threshold + 0.20, cloudBase + (cloudFine - 0.5) * 0.16);
+                // Below the cloud tops the deck is not painted on the ground; passing through cloud is
+                // shown by the wisp particles instead.
+                cloud *= saturate((altitudeKm - 4.0) / 10.0);
+
+                float ndl = dot(n, sun);
+                float day = smoothstep(-0.12, 0.22, ndl);
+                float diffuse = saturate(ndl) * 0.92 + 0.08;
+
+                float3 halfVector = normalize(sun - viewDir);
+                float glint = pow(saturate(dot(n, halfVector)), 110.0) * ocean * (1.0 - cloud) * 1.4;
+
+                float3 shaded = albedo * diffuse + glint;
+                shaded = lerp(shaded, float3(0.94, 0.95, 0.97) * (diffuse * 0.95 + 0.05), cloud * 0.92);
+                // Sunlight grazing through the atmosphere reddens the band beside the terminator.
+                float3 twilight = lerp(float3(1.0, 0.50, 0.26), float3(1.0, 1.0, 1.0), smoothstep(-0.02, 0.14, ndl));
+                shaded *= twilight;
+
+                // Night side: clustered city lights on land, hidden by cloud.
+                float land = 1.0 - ocean;
+                float cities = smoothstep(0.60, 0.88, ValueNoise3(nEarth * 240.0)) * smoothstep(0.45, 0.80, ValueNoise3(nEarth * 1700.0));
+                float3 nightSide = float3(0.0015, 0.0025, 0.006) + float3(1.0, 0.72, 0.38) * (cities * land * (1.0 - cloud) * 0.55);
+                shaded = shaded * day + nightSide * (1.0 - day);
+
+                // Aerial perspective. From orbit the haze thickens towards the limb; near the ground
+                // it thickens with distance, so the horizon dissolves into the sky colour.
+                float limbHaze = pow(1.0 - viewCos, 2.6) * 0.92;
+                float visibilityKm = lerp(14.0, 3200.0, saturate(altitudeKm / 90.0));
+                float distanceHaze = (1.0 - exp(-t / visibilityKm)) * (0.30 + 0.70 * _PhainonAtmosphere);
+                float haze = saturate(max(limbHaze, distanceHaze));
+
+                float3 hazeColor = _HazeColor.rgb * (0.04 + 0.96 * day);
+                return lerp(shaded, hazeColor, haze * 0.88);
+            }
+
+            float3 ShadeSky(float3 viewDir, float3 up, float3 sun, float camRadius, float above, float altitudeKm)
+            {
+                float atmosphere = _PhainonAtmosphere;
+                float daylight = smoothstep(-0.22, 0.18, dot(up, sun));
+
+                // Inside the atmosphere: a zenith-to-horizon gradient that thins with altitude.
+                float horizonBlend = exp(-above * 3.6);
+                float3 sky = lerp(_ZenithColor.rgb, _HorizonColor.rgb, horizonBlend) * atmosphere * daylight;
+
+                // The atmosphere seen edge-on: a broad glow near the ground, a thin blue line from orbit.
+                float tangentDistance = sqrt(max(camRadius * camRadius - EARTH_RADIUS_KM * EARTH_RADIUS_KM, 0.0));
+                float3 limbNormal = normalize(up * camRadius + viewDir * tangentDistance);
+                float limbLit = smoothstep(-0.14, 0.20, dot(limbNormal, sun));
+                float width = lerp(0.011, 0.24, sqrt(saturate(atmosphere)));
+                float band = exp(-above / width);
+                float core = exp(-above / (width * 0.32));
+                float3 limb = lerp(_LimbColor.rgb, float3(0.80, 0.90, 1.0), core) * band * limbLit * lerp(1.5, 0.55, atmosphere);
+                // Near the terminator the limb turns from blue to the orange of a sunrise seen from orbit.
+                limb *= lerp(float3(1.0, 0.42, 0.16), float3(1.0, 1.0, 1.0), smoothstep(-0.08, 0.15, dot(limbNormal, sun)));
+
+                float3 color = sky + limb;
+
+                // Sun disc with a tight corona and a wider glow that only exists where there is air.
+                float sunCos = dot(viewDir, sun);
+                float disc = smoothstep(0.99990, 0.99996, sunCos);
+                float corona = pow(saturate(sunCos), 900.0) * 2.5 + pow(saturate(sunCos), 48.0) * 0.30 * (0.25 + atmosphere);
+                color += float3(1.0, 0.96, 0.88) * (disc * _SunIntensity + corona);
+
+                float skyLuma = dot(color, float3(0.30, 0.59, 0.11));
+                float darkness = saturate(1.0 - skyLuma * 5.0);
+
+                // Moon: a lit sphere reconstructed from the angular offset to its centre.
+                float3 moonDir = DirectionOr(_PhainonMoonDir, float3(0.0, 0.2, 0.98));
+                const float moonRadius = 0.0135;      // radians; a little larger than life so it reads on screen
+                float moonCos = dot(viewDir, moonDir);
+                float moonEdge = cos(moonRadius);
+                if (moonCos > moonEdge)
+                {
+                    float3 offset = (viewDir - moonDir * moonCos) / sin(moonRadius);
+                    float r2 = saturate(dot(offset, offset));
+                    float3 moonNormal = normalize(offset - moonDir * sqrt(1.0 - r2));
+                    float maria = smoothstep(0.42, 0.62, Fbm3(moonNormal * 2.6 + 3.0));
+                    float craters = ValueNoise3(moonNormal * 22.0);
+                    float3 moonAlbedo = lerp(float3(0.20, 0.20, 0.21), float3(0.44, 0.43, 0.41), maria) * (0.85 + 0.30 * craters);
+                    float3 moonColor = moonAlbedo * saturate(dot(moonNormal, sun)) * 1.7;
+                    float edge = smoothstep(1.0, 0.92, r2);
+                    color = lerp(color, moonColor + color * 0.25, edge * (1.0 - 0.75 * atmosphere * daylight));
+                    darkness *= 1.0 - edge;
+                }
+
+                float3 inertialDir = normalize(mul(RotationOrIdentity(_PhainonWorldToInertial), viewDir));
+                // The Milky Way: a faint, mottled band along one great circle of the star field.
+                float galacticLatitude = dot(inertialDir, normalize(float3(0.35, 0.86, 0.37)));
+                float milkyWay = exp(-galacticLatitude * galacticLatitude * 26.0) * (0.35 + 0.65 * Fbm3(inertialDir * 5.0 + 1.7));
+                float3 starField = Stars(inertialDir) + float3(0.55, 0.60, 0.75) * (milkyWay * 0.05);
+                color += starField * (_StarBrightness * _PhainonStarVisibility * darkness);
+                return color;
+            }
+
+            half4 Frag(Varyings input) : SV_Target
+            {
+                float3 viewDir = normalize(input.viewDirWS);
+                float3 up = DirectionOr(_PhainonUpDir, float3(0.0, 1.0, 0.0));
+                float3 sun = DirectionOr(_PhainonSunDir, float3(0.5, 0.7, 0.5));
+
+                float altitudeKm = max(_PhainonAltitudeKm, 0.03);
+                float camRadius = EARTH_RADIUS_KM + altitudeKm;
+
+                // Angle of this pixel above the true (curved) horizon. Negative means it looks at the Earth.
+                float cosNadir = clamp(dot(viewDir, -up), -1.0, 1.0);
+                float limbAngle = asin(saturate(EARTH_RADIUS_KM / camRadius));
+                float above = acos(cosNadir) - limbAngle;
+
+                float3 color;
+                if (above < 0.0)
+                {
+                    color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir);
+
+                    // Blend the last sliver of surface into the atmosphere so the limb has no hard edge.
+                    float3 skyAtLimb = ShadeSky(viewDir, up, sun, camRadius, 0.0, altitudeKm);
+                    color = lerp(color, max(color, skyAtLimb * 0.85), smoothstep(-0.006, 0.0, above));
+                }
+                else
+                {
+                    color = ShadeSky(viewDir, up, sun, camRadius, above, altitudeKm);
+                }
+
+                return half4(color, 1.0);
+            }
+            ENDHLSL
+        }
+    }
+    FallBack Off
+}

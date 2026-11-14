@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 99314dea5f4f410f963367388491de2b, type: 3}
+  m_Name: MissionProfile
+  m_EditorClassIdentifier: Phainon.Runtime:Phainon:MissionProfile
+  spec:
+    missionName: OPERATION PHAINON
+    missionSubtitle: EARTH TO DEEP SPACE
+    countdownSeconds: 15
+    ignitionWindowSeconds: 6
+    liftoffThrustToWeight: 1.03
+    stageSeparationMinAltitudeMeters: 40000
+    orbitMinPeriapsisMeters: 150000
+    reentryFailAltitudeMeters: 60000
+    spaceBoundaryAltitudeMeters: 100000
+    maxQDetectMinPa: 8000
+    phases:
+    - phase: 0
+      title: PRE-LAUNCH
+      objective: Power up the spacecraft and bring every system to GO, then start the launch sequence.
+    - phase: 1
+      title: ATMOSPHERIC ASCENT
+      objective: Manage throttle through max-Q and hold the ascent until booster burnout.
+    - phase: 2
+      title: STAGE SEPARATION
+      objective: Booster is spent. Separate the stage, then ignite the upper stage engine.
+    - phase: 3
+      title: ORBITAL INSERTION
+      objective: Burn to orbital velocity. Cut the engine when ORBIT GO illuminates.
+    - phase: 4
+      title: OUTER SPACE
+      objective: 'Stable orbit achieved. The spacecraft is yours: attitude and propulsion remain live.'
+    - phase: 5
+      title: MISSION FAILED
+      objective: The mission cannot continue. Restart from the pause menu.

@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e646cc095d5934559bd7ba8857abb6a7, type: 3}
+  m_Name: VehicleConfig
+  m_EditorClassIdentifier: Phainon.Runtime::Phainon.VehicleConfig
+  spec:
+    vehicleName: PHAINON-1
+    stages:
+    - name: CORE BOOSTER
+      dryMassKg: 70000
+      propellantMassKg: 560000
+      thrustNewtons: 11400000
+      specificImpulseSeconds: 305
+      spoolUpSeconds: 3.5
+      spoolDownSeconds: 1
+    - name: UPPER STAGE
+      dryMassKg: 11000
+      propellantMassKg: 130000
+      thrustNewtons: 2150000
+      specificImpulseSeconds: 452
+      spoolUpSeconds: 2
+      spoolDownSeconds: 0.6
+    payloadMassKg: 26000
+    dragAreaCd: 38
+    ascentPitchProgram:
+    - altitudeMeters: 0
+      pitchDegrees: 90
+    - altitudeMeters: 300
+      pitchDegrees: 90
+    - altitudeMeters: 2000
+      pitchDegrees: 84
+    - altitudeMeters: 8000
+      pitchDegrees: 70
+    - altitudeMeters: 20000
+      pitchDegrees: 52
+    - altitudeMeters: 40000
+      pitchDegrees: 36
+    - altitudeMeters: 60000
+      pitchDegrees: 27
+    - altitudeMeters: 90000
+      pitchDegrees: 20
+    targetOrbitAltitudeMeters: 185000
+    verticalSpeedGain: 0.01
+    maxTargetClimbRate: 1200
+    maxTargetSinkRate: 150
+    verticalSpeedTimeConstant: 12
+    closedLoopMinPitchDegrees: -2
+    closedLoopMaxPitchDegrees: 53
+    guidancePitchRateDegPerSec: 3
+    manualPitchRateDegPerSec: 6
+    manualYawRateDegPerSec: 5
+    rollRateDegPerSec: 14
+    maxYawDegrees: 25
+    pitchTrimRangeDegrees: 8
+    minThrustLimit: 0.4

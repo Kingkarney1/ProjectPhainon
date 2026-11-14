@@ -1,0 +1,92 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5093af74cfe90a2e89cad180fc2bb1c5, type: 3}
+  m_Name: AudioLibrary
+  m_EditorClassIdentifier: Phainon.Runtime::Phainon.Audio.AudioLibrary
+  buttonPress:
+    clip: {fileID: 8300000, guid: e1ba22b1496905952a33a072f7c0eb58, type: 3}
+    volume: 0.55
+  switchOn:
+    clip: {fileID: 8300000, guid: 2ed3cf21e2c94e6f2b2af828305230e9, type: 3}
+    volume: 0.6
+  switchOff:
+    clip: {fileID: 8300000, guid: 24af630cccf3205ffb7c42257ef3f656, type: 3}
+    volume: 0.6
+  dialTick:
+    clip: {fileID: 8300000, guid: 85fb3e5ea716847c98e201d71341ac10, type: 3}
+    volume: 0.45
+  guardOpen:
+    clip: {fileID: 8300000, guid: 65639f4973b4d8a058de170acc5eb344, type: 3}
+    volume: 0.55
+  guardClose:
+    clip: {fileID: 8300000, guid: d696163ab7d510492916c5945ba1b7c3, type: 3}
+    volume: 0.5
+  leverMove:
+    clip: {fileID: 8300000, guid: b902d291a7409997981d9a655db472dc, type: 3}
+    volume: 0.4
+  denied:
+    clip: {fileID: 8300000, guid: 93f6fa435d3e79d9fadcf84c98bda7aa, type: 3}
+    volume: 0.5
+  powerUp:
+    clip: {fileID: 8300000, guid: 55e05fdb06fdc64468f2d36c482b26a8, type: 3}
+    volume: 0.55
+  powerDown:
+    clip: {fileID: 8300000, guid: f1da3345d2ec117708b2f8bf39e07647, type: 3}
+    volume: 0.5
+  engineIgnition:
+    clip: {fileID: 8300000, guid: c5426b92e198bc8a6b9b64323f6a4d32, type: 3}
+    volume: 0.9
+  engineCutoff:
+    clip: {fileID: 8300000, guid: c3fd65270245d5b6293b89e44e9addde, type: 3}
+    volume: 0.7
+  stageSeparation:
+    clip: {fileID: 8300000, guid: 2334625b45c73ee24b7cab1725e1e874, type: 3}
+    volume: 0.95
+  notification:
+    clip: {fileID: 8300000, guid: daca6bb1cd8874f16b94f567f35ae4af, type: 3}
+    volume: 0.4
+  countdownBeep:
+    clip: {fileID: 8300000, guid: b6e702dc26b0ac9f4bcd4af722582baf, type: 3}
+    volume: 0.45
+  cautionChime:
+    clip: {fileID: 8300000, guid: fe4164f8f1a4e864f885e24f7adfe727, type: 3}
+    volume: 0.5
+  missionComplete:
+    clip: {fileID: 8300000, guid: b80bfeaa7a269e90ebe0bcf6cb5412a8, type: 3}
+    volume: 0.6
+  missionFailed:
+    clip: {fileID: 8300000, guid: b97dd9d55da732f11bb38a82d379428a, type: 3}
+    volume: 0.6
+  cabinAmbient:
+    clip: {fileID: 8300000, guid: d8d3acb865ef3f659804210208d6ab55, type: 3}
+    volume: 0.32
+  electricalHum:
+    clip: {fileID: 8300000, guid: f227b29f1cf9ced7392947180157e40d, type: 3}
+    volume: 0.1
+  apuLoop:
+    clip: {fileID: 8300000, guid: cb4b5f1e0ee074a769a30fff115ae375, type: 3}
+    volume: 0.16
+  engineLoop:
+    clip: {fileID: 8300000, guid: 112f8dbbd0f1faf478690395ce0455fd, type: 3}
+    volume: 0.85
+  rumbleLoop:
+    clip: {fileID: 8300000, guid: 11a5eb615bfd3a5848894cb74c5fca15, type: 3}
+    volume: 0.75
+  windLoop:
+    clip: {fileID: 8300000, guid: c0803ed627ce43fb4935150402d4df7c, type: 3}
+    volume: 0.5
+  rcsLoop:
+    clip: {fileID: 8300000, guid: b3280ff9a79d54dbb869d2298d0e44d0, type: 3}
+    volume: 0.3
+  masterAlarm:
+    clip: {fileID: 8300000, guid: 2138e7db31af57c0d814e4412f9d0c3e, type: 3}
+    volume: 0.38

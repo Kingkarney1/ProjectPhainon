@@ -1,0 +1,62 @@
+using System;
+
+namespace Phainon.Simulation
+{
+    /// <summary>Tunable numbers for the spacecraft's housekeeping systems and warning limits.</summary>
+    [Serializable]
+    public class SystemsSpec
+    {
+        // Electrical.
+        public double nominalBusVoltage = 28.0;
+        public double batteryCapacityWattHours = 900;
+        public double baseLoadWatts = 900;
+        public double avionicsLoadWatts = 650;
+        public double commsLoadWatts = 300;
+        public double cabinLoadWatts = 550;
+        public double fuelPumpLoadWatts = 1400;
+        public double apuOutputWatts = 5200;
+        public double apuStartSeconds = 2.5;
+        public double batteryRechargeWatts = 400;
+
+        // Propellant feed.
+        public double tankPressurizeSeconds = 4.0;
+        public double tankVentSeconds = 6.0;
+        public double feedReadyThreshold = 0.95;
+
+        // Navigation and communications.
+        public double navAlignSeconds = 6.0;
+        public double commsAcquireSeconds = 3.5;
+
+        // Life support.
+        public double oxygenStartFraction = 0.98;
+        public double oxygenUsePerSecond = 0.000035;
+        public double nominalCabinPressureKpa = 101.3;
+        public double unpoweredCabinPressureKpa = 94.0;
+        /// <summary>Seconds for pressure to settle with the cabin loop running.</summary>
+        public double cabinPressureTimeConstant = 5.0;
+        /// <summary>Seconds for pressure to bleed down with the cabin loop off.</summary>
+        public double cabinLeakTimeConstant = 400.0;
+        public double initialCabinPressureKpa = 99.0;
+        public double cabinTempMinC = 17.0;
+        public double cabinTempMaxC = 27.0;
+        public double cabinTempDefaultC = 21.0;
+        public double unconditionedCabinTempC = 31.0;
+        /// <summary>Seconds for temperature to reach the setpoint with the cabin loop running.</summary>
+        public double cabinTempTimeConstant = 10.0;
+        /// <summary>Seconds for the cabin to warm up with the loop off.</summary>
+        public double cabinWarmTimeConstant = 240.0;
+        public double initialCabinTempC = 26.5;
+
+        // Warning limits.
+        public double lowBatteryFraction = 0.25;
+        public double lowFuelFraction = 0.10;
+        public double maxDynamicPressurePa = 21000;
+        public double maxGLoad = 4.0;
+        public double lowCabinPressureKpa = 97.0;
+        public double lowOxygenFraction = 0.20;
+        public double highCabinTempC = 28.5;
+        public double lowBusVoltage = 24.0;
+        /// <summary>Sinking below this altitude during ascent raises the trajectory warning.</summary>
+        public double trajectoryLowAltitudeMeters = 120000;
+    }
+}

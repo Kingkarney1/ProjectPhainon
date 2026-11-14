@@ -1,0 +1,172 @@
+using Phainon.Simulation;
+using UnityEngine;
+
+namespace Phainon.Environment
+{
+    /// <summary>
+    /// Turns spacecraft state into the view outside. The cockpit never moves: instead the world is
+    /// rotated around it to match the vehicle's attitude, and the sky shader is told the altitude,
+    /// the local vertical and where the Sun, Moon, stars and Earth's surface are.
+    /// </summary>
+    [DefaultExecutionOrder(-50)]
+    public class EnvironmentDirector : MonoBehaviour
+    {
+        private static readonly int SunDirId = Shader.PropertyToID("_PhainonSunDir");
+        private static readonly int UpDirId = Shader.PropertyToID("_PhainonUpDir");
+        private static readonly int MoonDirId = Shader.PropertyToID("_PhainonMoonDir");
+        private static readonly int AltitudeId = Shader.PropertyToID("_PhainonAltitudeKm");
+        private static readonly int AtmosphereId = Shader.PropertyToID("_PhainonAtmosphere");
+        private static readonly int StarVisibilityId = Shader.PropertyToID("_PhainonStarVisibility");
+        private static readonly int CloudTimeId = Shader.PropertyToID("_PhainonCloudTime");
+        private static readonly int WorldToEarthId = Shader.PropertyToID("_PhainonWorldToEarth");
+        private static readonly int WorldToInertialId = Shader.PropertyToID("_PhainonWorldToInertial");
+        private static readonly int HazeColorId = Shader.PropertyToID("_PhainonHazeColorNow");
+        private static readonly int SiteFadeId = Shader.PropertyToID("_PhainonSiteFade");
+
+        [SerializeField] internal SpacecraftController spacecraft;
+        [SerializeField] internal EnvironmentConfig config;
+        [Tooltip("Parent of everything that belongs to the outside world. It is counter-rotated against the vehicle's attitude.")]
+        [SerializeField] internal Transform worldRoot;
+        [Tooltip("A frame fixed to the ground under the launch point. The launch site and the ascent trail live in it.")]
+        [SerializeField] internal Transform groundFrame;
+        [SerializeField] internal Transform launchSite;
+        [SerializeField] internal Light sun;
+        [Tooltip("How quickly the view follows attitude changes. Smooths the 50 Hz simulation for display.")]
+        [SerializeField] internal float attitudeSmoothing = 14f;
+
+        private Quaternion levelToEarthAtLaunch;
+        private Vector3 sunInertial;
+        private Vector3 moonInertial;
+        private Quaternion shownAttitude;
+        private bool hasAttitude;
+        private float cloudTime;
+
+        /// <summary>1 on the ground, falling to 0 in vacuum. Other effects use it to fade with the air.</summary>
+        public float Atmosphere { get; private set; }
+        /// <summary>The vehicle's velocity direction in cockpit (world) space; zero when stationary.</summary>
+        public Vector3 AirflowDirection { get; private set; }
+        public float Daylight { get; private set; }
+
+        private void Awake()
+        {
+            // Earth-fixed axes: +Y is the north pole and longitude is measured from +X towards +Z.
+            float lat = config.launchLatitude * Mathf.Deg2Rad;
+            float lon = config.launchLongitude * Mathf.Deg2Rad;
+            Vector3 siteUp = new Vector3(Mathf.Cos(lat) * Mathf.Cos(lon), Mathf.Sin(lat), Mathf.Cos(lat) * Mathf.Sin(lon));
+            Vector3 east = new Vector3(-Mathf.Sin(lon), 0f, Mathf.Cos(lon));
+            // North at the site: the pole direction with its vertical component removed.
+            Vector3 north = (Vector3.up - siteUp * Vector3.Dot(Vector3.up, siteUp)).normalized;
+
+            float azimuth = config.launchAzimuth * Mathf.Deg2Rad;
+            Vector3 downrange = (north * Mathf.Cos(azimuth) + east * Mathf.Sin(azimuth)).normalized;
+            levelToEarthAtLaunch = Quaternion.LookRotation(downrange, siteUp);
+
+            sunInertial = DirectionFromAngles(config.sunAzimuth, config.sunElevation);
+            moonInertial = DirectionFromAngles(config.moonAzimuth, config.moonElevation);
+        }
+
+        /// <summary>Direction in the launch-site level frame: +Z downrange, +Y up, +X to the right of track.</summary>
+        private static Vector3 DirectionFromAngles(float azimuthDegrees, float elevationDegrees)
+        {
+            float az = azimuthDegrees * Mathf.Deg2Rad;
+            float el = elevationDegrees * Mathf.Deg2Rad;
+            return new Vector3(Mathf.Sin(az) * Mathf.Cos(el), Mathf.Sin(el), Mathf.Cos(az) * Mathf.Cos(el));
+        }
+
+        private void LateUpdate()
+        {
+            Spacecraft craft = spacecraft.Craft;
+            FlightModel flight = craft.Flight;
+            AttitudeController attitude = craft.Attitude;
+
+            // Vehicle attitude in the local level frame (+Z downrange, +Y up). Unity's Euler order
+            // applies yaw, then pitch, then roll, which is the order the angles are defined in.
+            // The cabin is then tipped nose-down from the thrust axis by a fixed angle.
+            Quaternion vehicle = Quaternion.Euler(-(float)attitude.PitchDegrees, (float)attitude.YawDegrees, -(float)attitude.RollDegrees)
+                                 * Quaternion.Euler(config.cabinTiltDegrees, 0f, 0f);
+            if (!hasAttitude) { shownAttitude = vehicle; hasAttitude = true; }
+            shownAttitude = Quaternion.Slerp(shownAttitude, vehicle, 1f - Mathf.Exp(-attitudeSmoothing * Time.deltaTime));
+
+            // The world is rotated the opposite way so the vehicle's nose stays along the cockpit's +Z.
+            Quaternion levelToWorld = Quaternion.Inverse(shownAttitude);
+            worldRoot.localRotation = levelToWorld;
+
+            // Travelling downrange tips the local vertical forward relative to where it was at launch.
+            float downrangeDegrees = (float)(flight.DownrangeAngle * Mathf.Rad2Deg);
+            Quaternion levelToInertial = Quaternion.Euler(downrangeDegrees, 0f, 0f);
+            Quaternion inertialToWorld = levelToWorld * Quaternion.Inverse(levelToInertial);
+
+            Vector3 up = levelToWorld * Vector3.up;
+            Vector3 sunDirection = inertialToWorld * sunInertial;
+            Vector3 moonDirection = inertialToWorld * moonInertial;
+
+            float altitudeKm = (float)(flight.AltitudeMeters / 1000.0);
+            Atmosphere = Mathf.Exp(-altitudeKm / Mathf.Max(0.1f, config.skyScaleHeightKm));
+            float stars = Mathf.InverseLerp(config.starsStartAltitudeKm, config.starsFullAltitudeKm, altitudeKm);
+            Daylight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(-0.22f, 0.18f, Vector3.Dot(up, sunDirection)));
+
+            cloudTime += Time.deltaTime * config.cloudDriftSpeed;
+
+            Shader.SetGlobalVector(UpDirId, up);
+            Shader.SetGlobalVector(SunDirId, sunDirection);
+            Shader.SetGlobalVector(MoonDirId, moonDirection);
+            // The cockpit sits on top of the stack, so on the pad the eye is already well above the ground.
+            Shader.SetGlobalFloat(AltitudeId, altitudeKm + config.stackHeight / 1000f);
+            Shader.SetGlobalFloat(AtmosphereId, Atmosphere);
+            Shader.SetGlobalFloat(StarVisibilityId, stars);
+            Shader.SetGlobalFloat(CloudTimeId, cloudTime);
+            Shader.SetGlobalMatrix(WorldToInertialId, Matrix4x4.Rotate(Quaternion.Inverse(inertialToWorld)));
+            Shader.SetGlobalMatrix(WorldToEarthId, Matrix4x4.Rotate(levelToEarthAtLaunch * levelToInertial * shownAttitude));
+
+            Color haze = config.horizonColor * (0.05f + 0.95f * Daylight);
+            Shader.SetGlobalColor(HazeColorId, haze);
+
+            UpdateSun(sunDirection);
+            UpdateAmbient(up, sunDirection);
+            UpdateLaunchSite(flight);
+            UpdateAirflow(flight);
+        }
+
+        private void UpdateSun(Vector3 sunDirection)
+        {
+            if (sun == null) return;
+            sun.transform.rotation = Quaternion.LookRotation(-sunDirection);
+            sun.color = config.sunColor;
+            // The Sun is harsher in vacuum, and switches off once the Earth is in the way.
+            float intensity = Mathf.Lerp(config.sunIntensitySpace, config.sunIntensityGround, Atmosphere);
+            sun.intensity = intensity * Daylight;
+        }
+
+        private void UpdateAmbient(Vector3 up, Vector3 sunDirection)
+        {
+            Color sky = config.groundAmbient * (Atmosphere * Daylight);
+            Color space = config.spaceAmbient + config.earthshine * ((1f - Atmosphere) * Daylight);
+            RenderSettings.ambientLight = sky + space;
+        }
+
+        private void UpdateLaunchSite(FlightModel flight)
+        {
+            float altitude = (float)flight.AltitudeMeters;
+            float fade = 1f - Mathf.InverseLerp(config.siteFadeStartAltitude, config.siteFadeEndAltitude, altitude);
+            Shader.SetGlobalFloat(SiteFadeId, fade);
+
+            // In the level frame the ground drops straight down and slides behind as the vehicle heads downrange.
+            groundFrame.localPosition = new Vector3(0f, -altitude, -(float)flight.DownrangeMeters);
+
+            if (launchSite == null) return;
+            bool visible = fade > 0f;
+            if (launchSite.gameObject.activeSelf != visible) launchSite.gameObject.SetActive(visible);
+        }
+
+        private void UpdateAirflow(FlightModel flight)
+        {
+            if (flight.Speed < 1.0)
+            {
+                AirflowDirection = Vector3.zero;
+                return;
+            }
+            Vector3 velocityLevel = new Vector3(0f, (float)flight.VerticalSpeed, (float)flight.TangentialVelocity).normalized;
+            AirflowDirection = worldRoot.rotation * velocityLevel;
+        }
+    }
+}

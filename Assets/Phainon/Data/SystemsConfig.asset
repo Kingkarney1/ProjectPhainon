@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff8a8d677cce463fb8b0b95075419af9, type: 3}
+  m_Name: SystemsConfig
+  m_EditorClassIdentifier: Phainon.Runtime:Phainon:SystemsConfig
+  spec:
+    nominalBusVoltage: 28
+    batteryCapacityWattHours: 900
+    baseLoadWatts: 900
+    avionicsLoadWatts: 650
+    commsLoadWatts: 300
+    cabinLoadWatts: 550
+    fuelPumpLoadWatts: 1400
+    apuOutputWatts: 5200
+    apuStartSeconds: 2.5
+    batteryRechargeWatts: 400
+    tankPressurizeSeconds: 4
+    tankVentSeconds: 6
+    feedReadyThreshold: 0.95
+    navAlignSeconds: 6
+    commsAcquireSeconds: 3.5
+    oxygenStartFraction: 0.98
+    oxygenUsePerSecond: 0.000035
+    nominalCabinPressureKpa: 101.3
+    unpoweredCabinPressureKpa: 94
+    cabinPressureTimeConstant: 5
+    cabinLeakTimeConstant: 400
+    initialCabinPressureKpa: 99
+    cabinTempMinC: 17
+    cabinTempMaxC: 27
+    cabinTempDefaultC: 21
+    unconditionedCabinTempC: 31
+    cabinTempTimeConstant: 10
+    cabinWarmTimeConstant: 240
+    initialCabinTempC: 26.5
+    lowBatteryFraction: 0.25
+    lowFuelFraction: 0.1
+    maxDynamicPressurePa: 21000
+    maxGLoad: 4
+    lowCabinPressureKpa: 97
+    lowOxygenFraction: 0.2
+    highCabinTempC: 28.5
+    lowBusVoltage: 24
+    trajectoryLowAltitudeMeters: 120000

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: SpaceSky
+  m_Shader: {fileID: 4800000, guid: a2a6c73d34352bfb7a7feff97aebd58c, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords:
+  - _HASEARTHTEX_ON
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _EarthDayTex:
+        m_Texture: {fileID: 2800000, guid: be7b1279f7c7f96329a1f0c025d73ab7, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _CloudCoverage: 0.52
+    - _HasEarthTex: 1
+    - _StarBrightness: 1.4
+    - _SunIntensity: 30
+    m_Colors:
+    - _HazeColor: {r: 0.5, g: 0.68, b: 0.95, a: 1}
+    - _HorizonColor: {r: 0.56, g: 0.74, b: 0.95, a: 1}
+    - _LimbColor: {r: 0.19999996, g: 0.45, b: 1, a: 1}
+    - _ZenithColor: {r: 0.06999998, g: 0.19999996, b: 0.58, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

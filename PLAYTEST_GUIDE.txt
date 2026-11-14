@@ -1,0 +1,106 @@
+OPERATION PHAINON: EARTH TO DEEP SPACE
+Private playtest build 0.1.0
+
+Thank you for testing. This is an early prototype of a spacecraft cockpit simulator: you sit in
+the command seat, power the spacecraft up switch by switch, and fly it from the launch pad into
+orbit. One mission, about ten minutes. Please do not share this build.
+
+
+WHAT YOU NEED
+  - Windows 10 or 11 (64-bit), or a Mac running macOS 12 or later, or 64-bit Linux
+  - A graphics card or integrated graphics from roughly 2017 or later, with up-to-date drivers
+  - A mouse with a scroll wheel (a laptop trackpad works, but is awkward)
+  - About 300 MB of free disk space
+  - Sound on: the alarms and engine tell you a lot
+
+
+INSTALLING ON WINDOWS
+  1. Right-click the zip file and choose "Extract All". Do not run the game from inside the zip.
+  2. Open the extracted folder and double-click OperationPhainon.exe.
+  3. Windows may show "Windows protected your PC" because the build is not code-signed.
+     Click "More info", then "Run anyway".
+  Nothing is installed on your system. To remove the game, delete the folder.
+  Keep all the files in the folder together; the .exe does not work on its own.
+
+
+INSTALLING ON A MAC
+  1. Double-click the .tar.gz file to unpack it. You get an "OperationPhainon" folder.
+  2. This test build is not signed by Apple, so macOS will refuse to open it until you clear the
+     download flag. Open the Terminal app, type the following with a space at the end:
+         xattr -cr
+     then drag OperationPhainon.app from the folder into the Terminal window and press Return.
+  3. Double-click OperationPhainon.app.
+     If macOS still blocks it: open System Settings, Privacy & Security, scroll down and click
+     "Open Anyway".
+  On a Mac with Apple silicon (M1 or later) the game runs through Rosetta. macOS offers to install
+  Rosetta the first time; accept it.
+  To remove the game, delete the folder.
+
+
+INSTALLING ON LINUX
+  Unpack the .tar.gz and run OperationPhainon.x86_64 from the unpacked folder.
+
+
+CONTROLS
+  Look around ............ hold RIGHT mouse button and move the mouse
+  Jump to a view ......... 1 window, 2 displays, 3 main panel, 4 left console, 5 right console,
+                           6 overhead panel
+  Zoom ................... hold Z (or the middle mouse button)
+  Press / flip ........... LEFT click a button or switch
+  Guarded buttons ........ the ones in a red frame: first click lifts the guard, second click presses
+  Turn a dial ............ hold left click and drag, or point at it and scroll
+  Throttle ............... Shift up, Ctrl down, T full, X idle (or drag the lever, left console)
+  Fly by hand ............ W S pitch, A D yaw, Q E roll (needs GUIDANCE off and RCS on)
+  Outside cameras ........ CAM SELECT on the overhead panel (key 6) swaps the right-hand display
+                           between the hull camera and a chase camera. Watch a launch on chase.
+  Hide / show the guide .. H
+  Pause, restart, quit ... Esc
+
+  The box at the top left always says what to do next, and the control it wants pulses amber.
+  The displays are small from the seat: press 2 and hold Z to read them.
+
+
+FLYING THE MISSION
+  1. Overhead panel (press 6): switch BATT A, BATT B and APU on.
+  2. Main panel (press 3): press MAIN POWER. The displays boot.
+     Switch FUEL PUMP, TANK PRESS and S-BAND XMIT on. Press NAV SYSTEM, COMMS and CABIN SYS.
+  3. Right console (press 5): turn NAV MODE to ASCENT and switch GUIDANCE on.
+  4. The centre display lists every system as GO or NO-GO. When all are GO, press LAUNCH SEQ.
+  5. Press T for full throttle. At T-6 go to the left console (press 4), lift the guard on
+     ENGINE IGNITION and press it. You lift off at T-0.
+  6. On the way up, ease the throttle back if a red warning appears (too much air pressure or G).
+     MASTER ALARM on the main panel silences the alarm.
+  7. When the booster burns out: lift the guard and press STAGE SEP, then ENGINE IGNITION again.
+  8. When ORBIT GO lights up, press ENGINE CUTOFF. You are in orbit.
+
+  You can fail: running out of fuel, falling back to Earth, or pressing ABORT ends the mission.
+  Esc, then "Restart mission" starts again.
+
+
+KNOWN ISSUES
+  - Placeholder art: the cockpit is built from simple shapes, and all sound is synthesised.
+  - No settings menu yet: no volume, resolution, graphics or key-binding options. Alt+Enter
+    (Windows, Linux) or Cmd+F (Mac) switches between full screen and a window.
+  - No save. The mission is short enough to replay.
+  - No gamepad support.
+
+
+WHAT WE WOULD LIKE TO HEAR
+  - Where did you get stuck or confused, and for how long?
+  - Could you find and read what you needed on the three displays?
+  - Did operating the buttons, switches, dials and throttle feel right?
+  - Did it reach orbit for you? If not, what ended the mission?
+  - Any crash, freeze, black or pink screen, or missing sound. Please include your graphics card.
+  - What did you most want to do that the game would not let you?
+
+  If something goes wrong, the log file helps a great deal. Please attach Player.log from:
+    Windows   %USERPROFILE%\AppData\LocalLow\Phainon Flight Systems\Operation Phainon
+              (paste that line into the File Explorer address bar)
+    Mac       ~/Library/Logs/Phainon Flight Systems/Operation Phainon
+              (in Finder: Go menu, Go to Folder, paste that line)
+    Linux     ~/.config/unity3d/Phainon Flight Systems/Operation Phainon
+
+  Send feedback to the person who gave you this build.
+
+Operation Phainon is a work of fiction and is not affiliated with any space agency.
+Earth imagery: NASA Blue Marble (public domain).
