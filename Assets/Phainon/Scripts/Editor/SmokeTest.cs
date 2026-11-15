@@ -38,6 +38,8 @@ namespace Phainon.EditorTools
         private static readonly StringBuilder report = new StringBuilder();
 
         private static double nextPoll;
+        private static bool reloadLocked;
+        private static float worstFrame;
 
         static SmokeTest()
         {
@@ -50,6 +52,18 @@ namespace Phainon.EditorTools
         {
             if (EditorApplication.timeSinceStartup < nextPoll) return;
             nextPoll = EditorApplication.timeSinceStartup + 1.0;
+
+            // A run whose scripts were reloaded under it is dead: the game is still playing but nothing in
+            // it works. End it, so the editor is never left like that.
+            if (EditorApplication.isPlaying && routine == null && SessionState.GetBool(RunningKey, false))
+            {
+                SessionState.SetBool(RunningKey, false);
+                Debug.LogWarning("[Phainon] SMOKE ABORTED: scripts were reloaded during the run. Leaving Play mode.");
+                EditorApplication.ExitPlaymode();
+                return;
+            }
+            if (!EditorApplication.isPlayingOrWillChangePlaymode) UnlockReload();
+
             if (!File.Exists(RequestPath) || EditorApplication.isCompiling || EditorApplication.isUpdating
                 || EditorApplication.isPlayingOrWillChangePlaymode || !ProjectBuilder.SceneIsCurrent) return;
             Run();
@@ -72,7 +86,17 @@ namespace Phainon.EditorTools
             if (SceneManager.GetActiveScene().path != BuildPaths.MissionScene)
                 EditorSceneManager.OpenScene(BuildPaths.MissionScene, OpenSceneMode.Single);
             SessionState.SetBool(RunningKey, true);
+            // Scripts changed during the run wait until it is over; a reload in Play mode would wreck it.
+            EditorApplication.LockReloadAssemblies();
+            reloadLocked = true;
             EditorApplication.EnterPlaymode();
+        }
+
+        private static void UnlockReload()
+        {
+            if (!reloadLocked) return;
+            reloadLocked = false;
+            EditorApplication.UnlockReloadAssemblies();
         }
 
         private static void OnPlayModeChanged(PlayModeStateChange change)
@@ -92,7 +116,9 @@ namespace Phainon.EditorTools
             else if (change == PlayModeStateChange.EnteredEditMode)
             {
                 SessionState.SetBool(RunningKey, false);
+                routine = null;
                 Detach();
+                UnlockReload();
             }
         }
 
@@ -109,7 +135,9 @@ namespace Phainon.EditorTools
 
         private static void Step()
         {
-            if (!EditorApplication.isPlaying || EditorApplication.timeSinceStartup < waitUntil) return;
+            if (!EditorApplication.isPlaying) return;
+            worstFrame = Mathf.Max(worstFrame, Time.unscaledDeltaTime);
+            if (EditorApplication.timeSinceStartup < waitUntil) return;
             try
             {
                 if (EditorApplication.timeSinceStartup > deadline) throw new TimeoutException("the run took more than two minutes");
@@ -133,8 +161,11 @@ namespace Phainon.EditorTools
             GameSession.SkipSequences = false;
             string summary = "[Phainon] SMOKE DONE: " + passed + " passed, " + failed + " failed. Pictures in " + ShotFolder;
             report.AppendLine(summary);
+            // Which code made this result: a run can start before the editor has compiled the latest change.
+            string stamp = "[Phainon] SMOKE RUN build " + ProjectBuilder.BuildVersion + ", editor scripts compiled "
+                           + File.GetLastWriteTime(typeof(SmokeTest).Assembly.Location).ToString("HH:mm:ss");
             Directory.CreateDirectory(ShotFolder);
-            File.WriteAllText(ShotFolder + "/result.txt", report.ToString());
+            File.WriteAllText(ShotFolder + "/result.txt", stamp + "\n" + report);
             Debug.Log(summary);
             EditorApplication.ExitPlaymode();
         }
@@ -182,7 +213,7 @@ namespace Phainon.EditorTools
             // colliders, so for this check it is given some: a control behind a wall can be clicked but not seen.
             var walls = new List<MeshCollider>();
             foreach (MeshFilter part in router.GetComponentsInChildren<MeshFilter>())
-                if (part.sharedMesh != null && part.GetComponent<Collider>() == null && IsModelPart(part.transform))
+                if (part.sharedMesh != null && part.GetComponent<Collider>() == null && IsModelPart(part.transform))    // the shell, seat and screens; not the thin detail on them
                     walls.Add(part.gameObject.AddComponent<MeshCollider>());
             bool hitBackfaces = Physics.queriesHitBackfaces;
             Physics.queriesHitBackfaces = true;
@@ -190,13 +221,22 @@ namespace Phainon.EditorTools
             var blocked = new List<string>();
             foreach (Interactable control in router.controls)
                 if (!Reaches(camera.transform.position, control, router.settings, walls)) blocked.Add(control.Label.Replace("\n", " "));
+            CockpitDisplay[] displays = router.GetComponentsInChildren<CockpitDisplay>(true);
+            var hiddenDisplays = new List<string>();
+            foreach (CockpitDisplay display in displays)
+            {
+                Vector3 to = display.transform.position - camera.transform.position;
+                RaycastHit wallHit;
+                foreach (MeshCollider wall in walls)
+                    if (wall.Raycast(new Ray(camera.transform.position, to.normalized), out wallHit, to.magnitude - 0.01f)) { hiddenDisplays.Add(display.unitName); break; }
+            }
             Physics.queriesHitBackfaces = hitBackfaces;
             foreach (MeshCollider wall in walls) Object.Destroy(wall);
             Check("the cabin model was found for the sight-line check", walls.Count > 0, walls.Count + " parts");
+            Check("no wall of the model stands between the eye and a display", hiddenDisplays.Count == 0, string.Join(", ", hiddenDisplays.ToArray()));
             Check("every control can be reached from the seat (" + (router.controls.Length - blocked.Count) + " of " + router.controls.Length + ")",
                 blocked.Count == 0, string.Join(", ", blocked.ToArray()));
 
-            CockpitDisplay[] displays = router.GetComponentsInChildren<CockpitDisplay>(true);
             Check("three display units are in the cockpit", displays.Length == 3, displays.Length + " found");
             var before = new string[displays.Length];
             for (int i = 0; i < displays.Length; i++) before[i] = Text(displays[i]);
@@ -233,11 +273,29 @@ namespace Phainon.EditorTools
             craft.CommandHandled -= onHandled;
 
             // Displays: lit, and showing something different a moment later (the throttle has moved, the clock has run).
+            // Performance over five seconds at the Displays view: frame times, what the renderer was asked to draw, and texture memory.
             int frames = Time.frameCount;
             float started = Time.realtimeSinceStartup;
-            yield return 2.0f;
-            Note("frame rate " + ((Time.frameCount - frames) / (Time.realtimeSinceStartup - started)).ToString("0") + " fps at "
-                 + Screen.width + "x" + Screen.height);
+            worstFrame = 0f;
+            yield return 5.0f;
+            float seconds = Time.realtimeSinceStartup - started;
+            int drawn = Mathf.Max(1, Time.frameCount - frames);
+            Note("frames: " + (drawn / seconds).ToString("0") + " fps average (" + (seconds / drawn * 1000f).ToString("0.0") + " ms), worst frame "
+                 + (worstFrame * 1000f).ToString("0") + " ms, at " + Screen.width + "x" + Screen.height + (UnityEditorInternal.InternalEditorUtility.isApplicationActive ? "" : ", editor not focused (throttled)"));
+            Note("renderer: " + UnityStats.drawCalls + " draw calls, " + UnityStats.setPassCalls + " SetPass calls, "
+                 + (System.Convert.ToInt64(UnityStats.triangles) / 1000) + "k triangles, render textures "
+                 + (System.Convert.ToInt64(UnityStats.renderTextureBytes) >> 20) + " MB");
+            long allTextures = 0, cockpitTextures = 0;
+            int cockpitCount = 0;
+            foreach (Texture texture in Resources.FindObjectsOfTypeAll<Texture>())
+            {
+                long bytes = UnityEngine.Profiling.Profiler.GetRuntimeMemorySizeLong(texture);
+                allTextures += bytes;
+                if (!AssetDatabase.GetAssetPath(texture).StartsWith(BuildPaths.Textures + "/Surface") && !AssetDatabase.GetAssetPath(texture).StartsWith(BuildPaths.Textures + "/Cockpit")) continue;
+                cockpitTextures += bytes;
+                cockpitCount++;
+            }
+            Note("texture memory: " + (allTextures >> 20) + " MB in all, of which " + cockpitCount + " cockpit surface textures take " + (cockpitTextures >> 20) + " MB");
             for (int i = 0; i < displays.Length; i++)
             {
                 bool lit = displays[i].content.alpha > 0.5f;
@@ -260,13 +318,18 @@ namespace Phainon.EditorTools
                 Capture(camera, (i + 1) + "_" + head.presets[i].name.Replace(' ', '_'));
             }
             // And some the keys do not give: each forward pane, level ahead, and back over the shoulder.
-            float[][] extra = { new[] { -30f, -20f }, new[] { 30f, -20f }, new[] { 0f, 0f }, new[] { 150f, 5f } };
-            string[] extraNames = { "7_Port_pane", "8_Starboard_pane", "9_Level_ahead", "10_Aft" };
+            float[][] extra = { new[] { -30f, -20f }, new[] { 30f, -20f }, new[] { 0f, 0f }, new[] { 150f, 5f },
+                                new[] { -45f, 28f }, new[] { 45f, 28f }, new[] { -20f, 52f }, new[] { 55f, 20f } };
+            string[] extraNames = { "7_Port_pane", "8_Starboard_pane", "9_Level_ahead", "10_Aft",
+                                    "17_Port_shelf", "18_Starboard_shelf", "19_Main_panel_close", "20_Starboard_housing_close" };
             for (int i = 0; i < extra.Length; i++)
             {
                 head.DirectedYaw = extra[i][0];
                 head.DirectedPitch = extra[i][1];
                 yield return 0.3f;
+                // The close-ups are taken zoomed in, as the Z key does, to judge the surface finishes.
+                // Set at the last moment: the head puts the field of view back every frame.
+                if (extraNames[i].EndsWith("close")) camera.fieldOfView = router.settings.zoomFov;
                 Capture(camera, extraNames[i]);
             }
             // The sky the windows do not happen to face: the spacecraft is turned for the pictures only.

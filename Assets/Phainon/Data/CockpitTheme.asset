@@ -12,15 +12,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9b8e40dfb01f2c2d39f49479dbc075a4, type: 3}
   m_Name: CockpitTheme
   m_EditorClassIdentifier: Phainon.Runtime::Phainon.CockpitTheme
-  textPrimary: {r: 0.9, g: 0.93, b: 0.95, a: 1}
-  textDim: {r: 0.52, g: 0.58, b: 0.63, a: 1}
-  nominalGreen: {r: 0.3, g: 0.92, b: 0.47, a: 1}
-  accentBlue: {r: 0.27, g: 0.66, b: 1, a: 1}
-  cautionAmber: {r: 1, g: 0.72, b: 0.12, a: 1}
-  warningRed: {r: 1, g: 0.24, b: 0.2, a: 1}
-  screenBackground: {r: 0.012, g: 0.02, b: 0.03, a: 1}
-  panelFill: {r: 0.045, g: 0.065, b: 0.085, a: 1}
-  panelOutline: {r: 0.16, g: 0.24, b: 0.31, a: 1}
-  gaugeTrack: {r: 0.1, g: 0.14, b: 0.18, a: 1}
+  textPrimary: {r: 0.88, g: 0.92, b: 0.94, a: 1}
+  textDim: {r: 0.44, g: 0.52, b: 0.58, a: 1}
+  nominalGreen: {r: 0.38, g: 0.86, b: 0.56, a: 1}
+  accentBlue: {r: 0.36, g: 0.72, b: 0.94, a: 1}
+  cautionAmber: {r: 0.98, g: 0.7, b: 0.2, a: 1}
+  warningRed: {r: 0.98, g: 0.3, b: 0.26, a: 1}
+  screenBackground: {r: 0.008, g: 0.013, b: 0.02, a: 1}
+  panelFill: {r: 0.026, g: 0.04, b: 0.054, a: 1}
+  panelOutline: {r: 0.13, g: 0.21, b: 0.28, a: 1}
+  gaugeTrack: {r: 0.07, g: 0.11, b: 0.15, a: 1}
   lampIntensity: 2.6
   blinkHz: 2.2

@@ -23,6 +23,9 @@ namespace Phainon.Displays
         [SerializeField] internal float bootSeconds = 1.8f;
         [Tooltip("Content opacity at the lowest brightness setting.")]
         [SerializeField] internal float minBrightness = 0.22f;
+        [Tooltip("A soft light in front of the screen: what the lit display throws onto the panel around it.")]
+        [SerializeField] internal Light glow;
+        [SerializeField] internal float glowIntensity = 0.14f;
 
         private PowerState state = PowerState.Off;
         private float bootTimer;
@@ -88,6 +91,7 @@ namespace Phainon.Displays
             float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
             content.alpha = Mathf.Lerp(content.alpha, contentTarget, k);
             bootScreen.alpha = Mathf.Lerp(bootScreen.alpha, bootTarget, k);
+            if (glow != null) glow.intensity = glowIntensity * Mathf.Max(content.alpha, bootScreen.alpha * 0.5f);
         }
 
         private void UpdateBootText()

@@ -74,6 +74,7 @@ Shader "Phainon/SpaceSky"
             float _PhainonBodyRadiusKm;     // radius of the body below; unset means Earth
             float _PhainonBody;             // 0 Earth, 1 Jupiter
             float _PhainonFeatureLon;       // longitude of the Great Red Spot, radians, for the drawn fallback
+            float4 _PhainonMoons[4];        // Jupiter's large moons: world direction and apparent radius in radians (0 = not shown)
 
             // The body's radius. Everything that used to assume Earth reads this instead.
             #define EARTH_RADIUS_KM (_PhainonBodyRadiusKm > 1.0 ? _PhainonBodyRadiusKm : 6371.0)
@@ -194,7 +195,10 @@ Shader "Phainon/SpaceSky"
                     float3 offset = (Hash33(cell + 7.0) - 0.5) * 0.55;
                     float size = lerp(0.07, 0.15, rnd.y * rnd.y);
                     float falloff = smoothstep(size, 0.0, length(local - offset));
-                    float brightness = lerp(0.18, 1.8, pow(rnd.z, 5.0)) * (layer == 2 ? 0.3 : 1.0);
+                    // A wide spread: most stars faint, a few bright.
+                    float brightness = lerp(0.14, 2.6, pow(rnd.z, 7.0)) * (layer == 2 ? 0.3 : 1.0);
+                    // Stars only twinkle through air. In vacuum this term is exactly one.
+                    brightness *= 1.0 + _PhainonAtmosphere * 0.35 * sin(_Time.y * (2.0 + 5.0 * rnd.x) + rnd.y * 40.0);
                     float3 tint = lerp(float3(0.72, 0.84, 1.0), float3(1.0, 0.90, 0.74), rnd.y);
                     color += falloff * brightness * tint * present;
                 }
@@ -348,16 +352,18 @@ Shader "Phainon/SpaceSky"
                 {
                     float u = atan2(nBody.z, nBody.x) / (2.0 * PI_F) + 0.5;
                     float v = asin(clamp(nBody.y, -1.0, 1.0)) / PI_F + 0.5;
-                    // One texel of a 2048-wide map covers about 219 km at Jupiter's equator.
+                    // One texel of the map as imported (about 3600 wide) covers about 125 km at Jupiter's equator.
                     float footprintKm = t * 0.0011 / max(viewCos, 0.03);
-                    albedo = SAMPLE_TEXTURE2D_LOD(_JupiterTex, sampler_JupiterTex, float2(u, v), log2(max(footprintKm / 219.0, 1.0))).rgb;
+                    albedo = SAMPLE_TEXTURE2D_LOD(_JupiterTex, sampler_JupiterTex, float2(u, v), log2(max(footprintKm / 125.0, 1.0))).rgb;
                 }
 
                 // Thick cloud scatters light softly: a gentle terminator and a darkened limb.
                 float ndl = dot(n, sun);
                 float lit = smoothstep(-0.06, 0.30, ndl) * (0.25 + 0.75 * saturate(ndl));
                 float limb = pow(viewCos, 0.35);
-                return albedo * (lit * limb * 1.2 + 0.003);
+                // High haze: a thin pale rim where the line of sight grazes the cloud tops on the sunlit side.
+                float haze = pow(1.0 - viewCos, 5.0) * smoothstep(-0.05, 0.25, ndl);
+                return albedo * (lit * limb * 1.2 + 0.003) + float3(0.95, 0.86, 0.72) * (haze * 0.22);
             }
 
             float3 ShadeSky(float3 viewDir, float3 up, float3 sun, float camRadius, float above, float altitudeKm)
@@ -410,6 +416,28 @@ Shader "Phainon/SpaceSky"
                     float edge = smoothstep(1.0, 0.92, r2);
                     color = lerp(color, moonColor + color * 0.25, edge * (1.0 - 0.75 * atmosphere * daylight));
                     darkness *= 1.0 - edge;
+                }
+
+                // Jupiter's four large moons, as small lit discs. Io is sulphur yellow, the others grey to tan.
+                if (_PhainonBody > 0.5)
+                {
+                    for (int m = 0; m < 4; m++)
+                    {
+                        float radius = _PhainonMoons[m].w;
+                        float3 moonAt = _PhainonMoons[m].xyz;
+                        float along = dot(viewDir, moonAt);
+                        if (radius > 0.0 && along > cos(radius))
+                        {
+                            float3 offset = (viewDir - moonAt * along) / sin(radius);
+                            float r2 = saturate(dot(offset, offset));
+                            float3 surface = normalize(offset - moonAt * sqrt(1.0 - r2));
+                            float3 tint = m == 0 ? float3(0.80, 0.70, 0.36) : (m == 1 ? float3(0.74, 0.70, 0.62) : (m == 2 ? float3(0.50, 0.46, 0.42) : float3(0.34, 0.31, 0.28)));
+                            float3 moonLit = tint * (0.8 + 0.4 * ValueNoise3(surface * 6.0 + m * 7.0)) * (saturate(dot(surface, sun)) * 1.6 + 0.01);
+                            float edge = smoothstep(1.0, 0.80, r2);
+                            color = lerp(color, moonLit, edge);
+                            darkness *= 1.0 - edge;
+                        }
+                    }
                 }
 
                 float3 inertialDir = normalize(mul(RotationOrIdentity(_PhainonWorldToInertial), viewDir));

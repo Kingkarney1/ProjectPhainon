@@ -12,3 +12,11 @@ JupiterMap.jpg
 
 ../Models/Hackathon.obj
   The cabin shell, seat and screen housings. Converted from the project's own SourceArt/Hackathon.blend.
+
+Cockpit/<Finish>/Color.jpg, Normal.jpg, Roughness.jpg, Metalness.jpg, Height.jpg
+  Photo-scanned surface sets from ambientCG (https://ambientcg.com), licence CC0 1.0 (public domain).
+  Fetched by Tools/fetch_textures.py; Mask.png in each folder is packed from them by the editor.
+    PaintedPanel       Plastic010  4K     PowderCoat         Metal046A   4K
+    BrushedAluminium   Metal011    2K     AnodisedAluminium  Metal032    2K
+    CarbonComposite    Fabric004   2K     Rubber             Rubber004   1K
+    MouldedPlastic     Plastic011  1K     SeatLeather        Leather026  1K

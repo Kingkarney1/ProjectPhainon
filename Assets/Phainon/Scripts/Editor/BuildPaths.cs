@@ -8,6 +8,8 @@ namespace Phainon.EditorTools
         public const string Materials = Root + "/Art/Materials";
         public const string Meshes = Root + "/Art/Meshes";
         public const string Textures = Root + "/Art/Textures";
+        /// <summary>Photo-scanned surface sets, one folder each. Fetched by Tools/fetch_textures.py.</summary>
+        public const string CockpitTextures = Textures + "/Cockpit";
         public const string Audio = Root + "/Audio";
         public const string Prefabs = Root + "/Prefabs/Controls";
         public const string Scenes = Root + "/Scenes";
@@ -16,6 +18,8 @@ namespace Phainon.EditorTools
         public const string JupiterTexture = Textures + "/JupiterMap.jpg";
         /// <summary>The cabin shell, seat and screens, converted from SourceArt/Hackathon.blend.</summary>
         public const string CockpitModel = Root + "/Art/Models/Hackathon.obj";
+        /// <summary>Panel joints, window seals and fasteners, derived from the model by Tools/cockpit_detail.py.</summary>
+        public const string CockpitDetail = Root + "/Art/Models/HackathonDetail.obj";
         public const string VolumeProfile = "Assets/Settings/CockpitPostProcess.asset";
 
         public const int LayerCockpit = 6;

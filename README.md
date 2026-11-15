@@ -161,11 +161,11 @@ Runs the simulation tests on the editor's bundled Mono and type-checks every ass
 
 ## Checking the scene in Play mode
 
-**Phainon > Run Smoke Test** (or creating the empty file `Library/PhainonSmokeRequest` while the editor is open) starts the story mission in Play mode for about twenty seconds. It checks that every control can be seen and reached from the seat, works one button, switch, dial and the throttle, checks the three displays are live, and saves a picture of each view to `Logs/PhainonShots` with the results in `result.txt`. It does not touch the story save.
+**Phainon > Run Smoke Test** (or creating the empty file `Library/PhainonSmokeRequest` while the editor is open) runs the story mission and then the launch pad in Play mode for about a minute. It checks that every control can be seen and reached from the seat, works one button, switch, dial and the throttle, checks the three displays are live, and saves a picture of each view to `Logs/PhainonShots` with the results in `result.txt`. It does not touch the story save.
 
 ## The cabin model
 
-The cabin shell, seat and screen housings are `Assets/Phainon/Art/Models/Hackathon.obj`, converted from `SourceArt/Hackathon.blend` (kept outside `Assets` because this editor has no Blender to import it with). To replace it, export from Blender as Wavefront OBJ with the default axes (Y up, -Z forward), modifiers applied and the object names kept, over the same file. `CockpitBuilder` scales and places it, gives each part a project material by name (`Seat`, `Screen...`, anything else is the shell), and fits the window glass, the three displays and the control panels to it; if its proportions change, the positions in `CockpitBuilder` need revisiting.
+The cabin shell, seat and screen housings are `Assets/Phainon/Art/Models/Hackathon.obj`, converted from `SourceArt/Hackathon.blend` (kept outside `Assets` because this editor has no Blender to import it with). `Tools/blend_to_obj.py` does the conversion: it applies the mirror modifiers and writes new texture coordinates in metres, because the blockout's own are collapsed and stretch any texture. A model exported from Blender itself works too (Wavefront OBJ, default axes, modifiers applied, object names kept) if it is unwrapped with Cube Projection at a cube size of 3.872, which is one metre at cockpit scale. `CockpitBuilder` scales and places it, gives each part a project material by name (`Seat`, `Screen...`, anything else is the shell), and fits the window glass, the three displays and the control panels to it; if its proportions change, the positions in `CockpitBuilder` need revisiting.
 
 ## Known limitations
 

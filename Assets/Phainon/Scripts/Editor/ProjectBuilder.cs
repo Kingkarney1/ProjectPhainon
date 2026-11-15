@@ -23,7 +23,7 @@ namespace Phainon.EditorTools
         /// Raise this whenever the builders change what they generate. An open editor then rebuilds
         /// the scene by itself, so the scene on disk can never lag behind the code that makes it.
         /// </summary>
-        public const int BuildVersion = 12;
+        public const int BuildVersion = 15;
         private const string StampPath = "Library/PhainonBuildVersion.txt";
 
         public static bool SceneIsCurrent
@@ -255,8 +255,8 @@ namespace Phainon.EditorTools
                 new CockpitCameraController.ViewPreset { name = "Window", yaw = 29f, pitch = -20f },
                 new CockpitCameraController.ViewPreset { name = "Displays", yaw = 0f, pitch = 21f },
                 new CockpitCameraController.ViewPreset { name = "Main panel", yaw = 0f, pitch = 49f },
-                new CockpitCameraController.ViewPreset { name = "Left console", yaw = -61f, pitch = 39f },
-                new CockpitCameraController.ViewPreset { name = "Right console", yaw = 61f, pitch = 39f },
+                new CockpitCameraController.ViewPreset { name = "Left console", yaw = -78f, pitch = 46f },
+                new CockpitCameraController.ViewPreset { name = "Right console", yaw = 78f, pitch = 46f },
                 new CockpitCameraController.ViewPreset { name = "Overhead panel", yaw = 0f, pitch = -54f }
             };
 
@@ -455,8 +455,9 @@ namespace Phainon.EditorTools
         private static void TryBuild()
         {
             if (ProjectBuilder.SceneIsCurrent) return;
-            // Wait for the editor to be idle and out of Play mode, then build.
-            if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.isPlayingOrWillChangePlaymode)
+            // Wait for the editor to be idle and out of Play mode, then build. While Play mode is being left the
+            // editor already says it is not playing, but the scene cannot be replaced until the game has gone.
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.isPlayingOrWillChangePlaymode || Application.isPlaying)
             {
                 EditorApplication.delayCall += TryBuild;
                 return;

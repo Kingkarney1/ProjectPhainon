@@ -39,6 +39,7 @@ namespace Phainon.EditorTools
             public TMP_Text bootText;
             public TMP_Text headerCentre;
             public TMP_Text headerRight;
+            public Light glow;
         }
 
         private Frame CreateFrame(Transform mount, string title, string unitName)
@@ -69,10 +70,23 @@ namespace Phainon.EditorTools
 
             // Header bar, common to all three units.
             ui.Image("Header", frame.content, 0f, 0f, CanvasWidth, 48f, theme.panelFill);
-            ui.Image("Header Rule", frame.content, 0f, 48f, CanvasWidth, 2f, theme.accentBlue);
-            ui.Text("Title", frame.content, 16f, 0f, 330f, 48f, title, 22f, theme.textPrimary, TextAlignmentOptions.Left, FontStyles.Bold);
+            ui.Image("Header Rule", frame.content, 0f, 47f, CanvasWidth, 1f, theme.panelOutline);
+            ui.Image("Header Accent", frame.content, 0f, 46f, 236f, 2f, theme.accentBlue);
+            // The unit's tag, as stencilled on the bezel of a real display unit: DU1, DU2, DU3.
+            string tag = "DU" + unitName.Substring(unitName.Length - 1);
+            ui.Image("Tag", frame.content, 14f, 12f, 46f, 24f, theme.accentBlue);
+            ui.Text("Tag Text", frame.content, 14f, 12f, 46f, 24f, tag, 15f, theme.screenBackground, TextAlignmentOptions.Center, FontStyles.Bold);
+            TextMeshProUGUI heading = ui.Text("Title", frame.content, 72f, 0f, 280f, 48f, title, 20f, theme.textPrimary, TextAlignmentOptions.Left, FontStyles.Bold);
+            heading.characterSpacing = 8f;
             frame.headerCentre = ui.Text("Header Centre", frame.content, 320f, 0f, 360f, 48f, "", 21f, theme.accentBlue, TextAlignmentOptions.Center, FontStyles.Bold);
             frame.headerRight = ui.Text("Header Right", frame.content, 690f, 0f, 294f, 48f, "", 24f, theme.nominalGreen, TextAlignmentOptions.Right, FontStyles.Bold);
+
+            // The glass itself: darker towards the corners. Part of the content, so it fades with the screen.
+            RectTransform vignette = ui.Fill("Vignette", frame.content);
+            ui.Image(vignette, new Color(0f, 0f, 0f, 0.55f), assets.Vignette);
+
+            // What the lit screen throws onto its surround. The display drives it with its own brightness.
+            frame.glow = SceneKit.PointLight("Screen Glow", mount, new Vector3(0f, 0f, -0.05f), new Color(0.45f, 0.68f, 0.95f), 0f, 0.5f);
 
             RectTransform boot = ui.Fill("Boot Screen", canvasRect);
             frame.bootGroup = boot.gameObject.AddComponent<CanvasGroup>();
@@ -91,6 +105,7 @@ namespace Phainon.EditorTools
             display.bootScreen = frame.bootGroup;
             display.bootText = frame.bootText;
             display.unitName = unitName;
+            display.glow = frame.glow;
         }
 
         // ---------------------------------------------------------------- display 1: flight and navigation

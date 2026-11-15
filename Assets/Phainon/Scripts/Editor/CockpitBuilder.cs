@@ -36,7 +36,7 @@ namespace Phainon.EditorTools
         private readonly AssetFactory assets;
         private readonly SpacecraftController spacecraft;
 
-        private Material shellMat, hullDark, structure, panel, panelBlack, bezel, glassBlack, fabric, fixture, accent, glass;
+        private Material shellMat, hullDark, structure, panel, panelBlack, bezel, glassBlack, fabric, fixture, glass;
         private Material marking, hazard;
 
         public CockpitBuilder(AssetFactory assets, SpacecraftController spacecraft)
@@ -55,7 +55,6 @@ namespace Phainon.EditorTools
 
             BuildModel();
             BuildWindows();
-            BuildConsoleStructure();
             BuildDisplayMounts();
             BuildAnnunciators();
             BuildMainPanel();
@@ -71,18 +70,21 @@ namespace Phainon.EditorTools
 
         private void CreateMaterials()
         {
-            // The shell is one surface seen from inside, so it is drawn on both sides. The model's texture
-            // coordinates are not laid out for a tiled finish, so the modelled parts are plain colours.
-            shellMat = assets.Lit("CabinShell", new Color(0.21f, 0.22f, 0.23f), 0.0f, 0.3f);
+            // Each kind of surface has its own finish. The modelled parts carry texture coordinates in
+            // metres (see the README), so tiling is in repeats per metre everywhere.
+            // The shell is painted metal, one surface seen from inside, so it is drawn on both sides.
+            shellMat = assets.Lit("CabinShell", new Color(0.23f, 0.24f, 0.25f), 0.0f, 0.42f, assets.Paint, 6f, false, 0.5f);
             shellMat.SetFloat("_Cull", 0f);
-            hullDark = assets.Lit("HullLiningDark", new Color(0.17f, 0.18f, 0.19f), 0.0f, 0.2f, assets.Grain, 5f);
-            structure = assets.Lit("StructureGrey", new Color(0.30f, 0.31f, 0.33f), 0.75f, 0.5f, assets.Brushed, 4f, false, 0.12f);
-            panel = assets.Lit("PanelCharcoal", new Color(0.060f, 0.063f, 0.068f), 0.15f, 0.32f, assets.Grain, 9f);
-            panelBlack = assets.Lit("PanelBlack", new Color(0.022f, 0.023f, 0.025f), 0.1f, 0.28f, assets.Grain, 9f);
-            bezel = assets.Lit("DisplayBezel", new Color(0.03f, 0.031f, 0.034f), 0.4f, 0.55f);
+            hullDark = assets.Lit("HullLiningDark", new Color(0.12f, 0.125f, 0.13f), 0.0f, 0.35f, assets.Paint, 6f, false, 0.5f);
+            // Bare brushed aluminium for rails, edge strips and fasteners.
+            structure = assets.Lit("StructureGrey", new Color(0.46f, 0.47f, 0.49f), 0.9f, 0.62f, assets.Brushed, 6f, false, 0.25f);
+            // Panel faces are powder-coated; the housings behind them are woven composite.
+            panel = assets.Lit("PanelCharcoal", new Color(0.060f, 0.063f, 0.068f), 0.15f, 0.36f, assets.Grain, 9f);
+            panelBlack = assets.Lit("PanelBlack", new Color(0.030f, 0.031f, 0.034f), 0.0f, 0.55f, assets.Weave, 5f, false, 0.6f);
+            // Display housings are dark anodised metal.
+            bezel = assets.Lit("DisplayBezel", new Color(0.045f, 0.047f, 0.053f), 0.75f, 0.52f, assets.Anodised, 8f, false, 0.3f);
             glassBlack = assets.Lit("ScreenGlass", new Color(0.004f, 0.005f, 0.007f), 0.0f, 0.92f);
-            fabric = assets.Lit("SeatFabric", new Color(0.075f, 0.085f, 0.11f), 0.0f, 0.12f);
-            accent = assets.Lit("AccentBlue", new Color(0.06f, 0.20f, 0.42f), 0.2f, 0.45f);
+            fabric = assets.Lit("SeatFabric", new Color(0.075f, 0.085f, 0.11f), 0.0f, 0.12f, assets.Upholstery, 3.5f, false, 0.4f);
             fixture = assets.Emissive("LightFixture", new Color(0.9f, 0.9f, 0.86f), new Color(1.6f, 1.5f, 1.3f));
             glass = assets.Custom("WindowGlass", "Phainon/WindowGlass");
             marking = assets.Emissive("PanelMarking", new Color(0.8f, 0.82f, 0.84f), new Color(0.16f, 0.17f, 0.18f));
@@ -110,23 +112,11 @@ namespace Phainon.EditorTools
         /// </summary>
         private void BuildModel()
         {
-            var importer = AssetImporter.GetAtPath(BuildPaths.CockpitModel) as ModelImporter;
-            if (importer == null)
+            if (!PrepareModel(BuildPaths.CockpitModel))
             {
                 // Nothing stands in for a missing model: the cabin is visibly absent and the log says why.
                 Debug.LogError("[Phainon] Cockpit model not found at " + BuildPaths.CockpitModel + ". The cabin shell, seat and screens are missing.");
                 return;
-            }
-            if (importer.globalScale != 1f || importer.useFileScale || importer.importNormals != ModelImporterNormals.Calculate
-                || importer.normalSmoothingAngle != 30f || importer.materialImportMode != ModelImporterMaterialImportMode.None)
-            {
-                importer.globalScale = 1f;
-                importer.useFileScale = false;
-                // The file has no normals. A hard-surface blockout wants its edges kept crisp.
-                importer.importNormals = ModelImporterNormals.Calculate;
-                importer.normalSmoothingAngle = 30f;
-                importer.materialImportMode = ModelImporterMaterialImportMode.None;
-                importer.SaveAndReimport();
             }
 
             var asset = AssetDatabase.LoadAssetAtPath<GameObject>(BuildPaths.CockpitModel);
@@ -162,8 +152,64 @@ namespace Phainon.EditorTools
                       + all.min.ToString("0.00") + " to " + all.max.ToString("0.00") + (centreScreen.HasValue ? "" : ", centre screen not identified")
                       + (reversed ? ", turned to face forward" : ""));
 
+            BuildDetail(t);
+
             // The model is open behind the seat. A plain bulkhead closes the cabin.
             SceneKit.Box("Rear Bulkhead", Root, new Vector3(0f, 1.01f, -1.34f), new Vector3(3.0f, 2.1f, 0.05f), hullDark, true);
+        }
+
+        /// <summary>Sets a model file to import at its own scale, with computed normals and no materials of its own. False if the file is missing.</summary>
+        private static bool PrepareModel(string path)
+        {
+            var importer = AssetImporter.GetAtPath(path) as ModelImporter;
+            if (importer == null) return false;
+            if (importer.globalScale != 1f || importer.useFileScale || importer.importNormals != ModelImporterNormals.Calculate
+                || importer.normalSmoothingAngle != 30f || importer.materialImportMode != ModelImporterMaterialImportMode.None)
+            {
+                importer.globalScale = 1f;
+                importer.useFileScale = false;
+                // The files have no normals. Hard surfaces want their edges kept crisp.
+                importer.importNormals = ModelImporterNormals.Calculate;
+                importer.normalSmoothingAngle = 30f;
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.SaveAndReimport();
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Panel joints along the shell's fold lines, rubber seals round the window openings and
+        /// fasteners round each large flat panel. Their positions are computed from the model
+        /// (Tools/cockpit_detail.py), and they are placed with the model's own transform.
+        /// </summary>
+        private void BuildDetail(Transform model)
+        {
+            if (!PrepareModel(BuildPaths.CockpitDetail))
+            {
+                Debug.LogWarning("[Phainon] " + BuildPaths.CockpitDetail + " is missing, so the cabin has no panel joints, seals or fasteners. Tools/cockpit_detail.py makes it.");
+                return;
+            }
+            Material seam = assets.Lit("PanelSeam", new Color(0.012f, 0.012f, 0.014f), 0.0f, 0.15f);
+            Material gasket = assets.Lit("WindowGasket", new Color(0.035f, 0.035f, 0.038f), 0.0f, 0.3f, assets.Rubber, 4f, false, 0.6f);
+            Material fastener = assets.Lit("FastenerSteel", new Color(0.30f, 0.31f, 0.33f), 0.9f, 0.6f, assets.Brushed, 6f, false, 0.25f);
+
+            GameObject detail = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(BuildPaths.CockpitDetail));
+            detail.name = "Cabin Detail";
+            detail.transform.SetParent(Root, false);
+            detail.transform.localPosition = model.localPosition;
+            detail.transform.localRotation = model.localRotation;
+            detail.transform.localScale = model.localScale;
+            foreach (MeshRenderer renderer in detail.GetComponentsInChildren<MeshRenderer>())
+            {
+                string part = renderer.name.ToLowerInvariant();
+                Material material = part.Contains("seam") ? seam : (part.Contains("gasket") ? gasket : fastener);
+                var materials = new Material[renderer.sharedMaterials.Length];
+                for (int i = 0; i < materials.Length; i++) materials[i] = material;
+                renderer.sharedMaterials = materials;
+                // Too thin to throw a shadow worth its cost.
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+            }
+            SceneKit.SetLayer(detail, BuildPaths.LayerCockpit);
         }
 
         // ---------------------------------------------------------------- windows
@@ -205,20 +251,6 @@ namespace Phainon.EditorTools
             GameObject pane = SceneKit.Quad(name, parent, centre + outward * 0.04f, new Vector2(width, height), glass);
             pane.transform.localRotation = Quaternion.LookRotation(outward, up);
             pane.GetComponent<Renderer>().receiveShadows = false;
-        }
-
-        // ---------------------------------------------------------------- console structure
-
-        private void BuildConsoleStructure()
-        {
-            Transform console = SceneKit.Empty("Console Structure", Root, Vector3.zero).transform;
-
-            // Pedestals under the left and right panels. They sit strictly below the panel faces, so no structure can cover a control.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                SceneKit.Box("Side Pedestal", console, new Vector3(side * 0.70f, 0.26f, 0.30f), new Vector3(0.46f, 0.52f, 0.78f), panelBlack, true, new Vector3(0f, side * 25f, 0f));
-                SceneKit.Box("Pedestal Trim", console, new Vector3(side * 0.50f, 0.02f, 0.24f), new Vector3(0.04f, 0.04f, 0.86f), accent, false, new Vector3(0f, side * 25f, 0f), false);
-            }
         }
 
         /// <summary>
@@ -296,6 +328,7 @@ namespace Phainon.EditorTools
             Transform p = Panel("Main Control Panel", new Vector3(0f, 0.555f, 0.56f), new Vector3(55f, 0f, 0f), size, true, new Vector3(1.06f, 0.36f, 0.22f));
 
             Controls.AddLabel("SYSTEMS", p, new Vector2(-0.215f, 0.148f), 7f, false);
+            Controls.AddLabel("PNL 1", p, new Vector2(-0.475f, -0.156f), 5f, false);
             Controls.AddLabel("PROPELLANT  /  COMMUNICATIONS", p, new Vector2(0f, -0.152f), 6f, false);
 
             // Upper row: system push buttons, flanked by two dials.
@@ -345,6 +378,7 @@ namespace Phainon.EditorTools
             Transform p = Panel("Overhead Panel", new Vector3(0f, 1.705f, 0.353f), new Vector3(-54f, 0f, 0f), size, true, new Vector3(0.62f, 0.24f, 0.12f));
 
             Controls.AddLabel("ELECTRICAL", p, new Vector2(-0.135f, 0.083f), 7f, false);
+            Controls.AddLabel("PNL 4", p, new Vector2(-0.215f, -0.086f), 5f, false);
             Controls.AddLabel("UTILITY", p, new Vector2(0.125f, 0.083f), 7f, false);
             SceneKit.Box("Rule", p, new Vector3(-0.005f, 0f, -0.0005f), new Vector3(0.0014f, 0.15f, 0.001f), marking, false, default(Vector3), false);
 
@@ -368,11 +402,17 @@ namespace Phainon.EditorTools
 
         // ---------------------------------------------------------------- side consoles
 
+        // Where the starboard side console sits; port mirrors it. Each stands on the model's side shelf beside
+        // the seat, at a place where, from the eye, no part of the model comes in front of the panel face
+        // and the panel covers neither the outer display nor the main panel.
+        private static readonly Vector3 SideConsole = new Vector3(0.54f, 0.64f, 0.08f);
+
         private void BuildLeftConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
-            Transform p = Panel("Propulsion Console (Left)", new Vector3(-0.62f, 0.65f, 0.34f), new Vector3(70f, -25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
+            Transform p = Panel("Propulsion Console (Left)", new Vector3(-SideConsole.x, SideConsole.y, SideConsole.z), new Vector3(70f, -25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("PROPULSION", p, new Vector2(0f, 0.268f), 8f, false);
+            Controls.AddLabel("PNL 2", p, new Vector2(-0.155f, -0.276f), 5f, false);
 
             Controls.Throttle(p, new Vector2(-0.085f, -0.035f), ControlId.Throttle, "THROTTLE");
             Controls.Dial(p, new Vector2(0.095f, 0.150f), ControlId.ThrustLimit, "THRUST LIMIT", 1f, "{0:0}%", 40f, 100f);
@@ -384,8 +424,9 @@ namespace Phainon.EditorTools
         private void BuildRightConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
-            Transform p = Panel("Flight Control Console (Right)", new Vector3(0.62f, 0.65f, 0.34f), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
+            Transform p = Panel("Flight Control Console (Right)", new Vector3(SideConsole.x, SideConsole.y, SideConsole.z), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("FLIGHT CONTROL", p, new Vector2(0f, 0.268f), 8f, false);
+            Controls.AddLabel("PNL 3", p, new Vector2(-0.155f, -0.276f), 5f, false);
 
             Controls.Dial(p, new Vector2(-0.085f, 0.135f), ControlId.NavMode, "NAV MODE", 0f, "{0}", 0f, 3f, new[] { "STBY", "ASCENT", "ORBIT", "RETRO" });
             Controls.Switch(p, new Vector2(0.060f, 0.155f), ControlId.Guidance, "GUIDANCE");
@@ -437,8 +478,8 @@ namespace Phainon.EditorTools
             // Small lights above the instrument panel wash it from the crew's side.
             panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(-0.3f, 1.10f, 0.40f), new Vector3(68f, 8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
             panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(0.3f, 1.10f, 0.40f), new Vector3(68f, -8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
-            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(-0.66f, 1.18f, 0.28f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
-            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(0.66f, 1.18f, 0.28f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
+            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(-SideConsole.x, 1.15f, SideConsole.z), new Vector3(85f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
+            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(SideConsole.x, 1.15f, SideConsole.z), new Vector3(85f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
 
             Light alarm = SceneKit.PointLight("Alarm Beacon", lights, new Vector3(0f, 1.32f, 0.45f), new Color(1f, 0.12f, 0.08f), 0f, 3.2f);
             Light glow = SceneKit.PointLight("Engine Glow", lights, new Vector3(0f, 1.55f, 1.0f), new Color(1f, 0.62f, 0.30f), 0f, 3.5f);

@@ -25,6 +25,14 @@ namespace Phainon.Environment
         private static readonly int BodyRadiusId = Shader.PropertyToID("_PhainonBodyRadiusKm");
         private static readonly int BodyId = Shader.PropertyToID("_PhainonBody");
         private static readonly int FeatureLonId = Shader.PropertyToID("_PhainonFeatureLon");
+        private static readonly int MoonsId = Shader.PropertyToID("_PhainonMoons");
+
+        // Io, Europa, Ganymede, Callisto: orbit radius (m), period (s), radius (m), and where each starts round its orbit (radians).
+        private static readonly double[] MoonOrbit = { 4.217e8, 6.711e8, 1.0704e9, 1.8827e9 };
+        private static readonly double[] MoonPeriod = { 152854.0, 306822.0, 618153.0, 1441931.0 };
+        private static readonly double[] MoonRadius = { 1.8216e6, 1.5608e6, 2.6341e6, 2.4103e6 };
+        private static readonly double[] MoonStart = { 0.6, 2.4, 4.0, 5.3 };
+        private readonly Vector4[] moons = new Vector4[4];
 
         [SerializeField] internal SpacecraftController spacecraft;
         [SerializeField] internal EnvironmentConfig config;
@@ -153,10 +161,33 @@ namespace Phainon.Environment
             Color haze = config.horizonColor * (0.05f + 0.95f * Daylight);
             Shader.SetGlobalColor(HazeColorId, haze);
 
+            UpdateMoons(craft, away && body.name == "JUPITER", inertialToWorld);
             UpdateSun(sunDirection, away);
             UpdateAmbient(up, sunDirection, away);
             UpdateLaunchSite(flight, away);
             UpdateAirflow(flight);
+        }
+
+        /// <summary>
+        /// Jupiter's four large moons on circular orbits in the flight plane, turning the same way the
+        /// spacecraft flies. They are scenery: the flight model has one centre of gravity.
+        /// </summary>
+        private void UpdateMoons(Spacecraft craft, bool shown, Quaternion inertialToWorld)
+        {
+            for (int i = 0; i < moons.Length; i++)
+            {
+                if (!shown) { moons[i] = Vector4.zero; continue; }
+                // In the frame the flight starts in: +Y is up at the start, +Z the way the vehicle travels.
+                double here = craft.Flight.DownrangeAngle, there = MoonStart[i] + 2.0 * System.Math.PI * craft.SimClockSeconds / MoonPeriod[i];
+                double y = MoonOrbit[i] * System.Math.Cos(there) - craft.Flight.Radius * System.Math.Cos(here);
+                double z = MoonOrbit[i] * System.Math.Sin(there) - craft.Flight.Radius * System.Math.Sin(here);
+                double distance = System.Math.Sqrt(y * y + z * z);
+                Vector3 direction = inertialToWorld * new Vector3(0f, (float)(y / distance), (float)(z / distance));
+                // Never smaller than a pixel or so, so a distant moon still shows as a point.
+                float radius = Mathf.Max(0.0016f, (float)System.Math.Asin(System.Math.Min(1.0, MoonRadius[i] / distance)));
+                moons[i] = new Vector4(direction.x, direction.y, direction.z, radius);
+            }
+            Shader.SetGlobalVectorArray(MoonsId, moons);
         }
 
         /// <summary>The Sun as the mission places it: in the flight plane, lifted a little out of it.</summary>
@@ -186,7 +217,8 @@ namespace Phainon.Environment
             }
 
             // The reflection only needs redoing when the light has moved enough to show.
-            if (cabinProbe != null && Vector3.Angle(sunDirection, probeSun) > 5f)
+            // (An unset direction means it has never been done.)
+            if (cabinProbe != null && (probeSun == Vector3.zero || Vector3.Angle(sunDirection, probeSun) > 5f))
             {
                 probeSun = sunDirection;
                 cabinProbe.RenderProbe();

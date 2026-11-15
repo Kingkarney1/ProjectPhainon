@@ -44,17 +44,19 @@ namespace Phainon.EditorTools
             this.assets = assets;
             this.spacecraft = spacecraft;
 
-            bezel = assets.Lit("ControlBezel", new Color(0.035f, 0.037f, 0.04f), 0.3f, 0.45f, true);
-            cap = assets.Lit("ButtonCap", new Color(0.13f, 0.135f, 0.14f), 0.0f, 0.35f);
-            capRed = assets.Lit("ButtonCapRed", new Color(0.42f, 0.05f, 0.04f), 0.0f, 0.4f);
+            // Surrounds are anodised metal, caps moulded plastic, knobs and the throttle grip rubber, knob tops brushed metal.
+            bezel = assets.Lit("ControlBezel", new Color(0.035f, 0.037f, 0.04f), 0.7f, 0.5f, assets.Anodised, 12f, true, 0.3f);
+            cap = assets.Lit("ButtonCap", new Color(0.13f, 0.135f, 0.14f), 0.0f, 0.42f, assets.Plastic, 24f, false, 0.35f);
+            capRed = assets.Lit("ButtonCapRed", new Color(0.42f, 0.05f, 0.04f), 0.0f, 0.45f, assets.Plastic, 24f, false, 0.35f);
             lens = assets.Lit("LampLens", LensDark, 0.0f, 0.75f, true);
             metal = assets.Lit("SwitchMetal", new Color(0.62f, 0.63f, 0.65f), 0.9f, 0.7f);
-            knob = assets.Lit("KnobBody", new Color(0.03f, 0.03f, 0.032f), 0.1f, 0.3f);
-            knobTop = assets.Lit("KnobTop", new Color(0.22f, 0.225f, 0.23f), 0.6f, 0.55f);
+            // Cylinders are textured once round, not per metre: two tiles put some fifty grip diamonds round a knob.
+            knob = assets.Lit("KnobBody", new Color(0.03f, 0.03f, 0.032f), 0.0f, 0.3f, assets.Knurl, 2f, false, 0.8f);
+            knobTop = assets.Lit("KnobTop", new Color(0.32f, 0.325f, 0.33f), 0.85f, 0.6f, assets.Brushed, 1f, false, 0.25f);
             marking = assets.Emissive("PanelMarking", new Color(0.8f, 0.82f, 0.84f), new Color(0.16f, 0.17f, 0.18f));
-            guardRed = assets.Lit("GuardRed", new Color(0.62f, 0.06f, 0.04f), 0.1f, 0.5f);
+            guardRed = assets.Lit("GuardRed", new Color(0.62f, 0.06f, 0.04f), 0.1f, 0.5f, assets.Plastic, 20f, false, 0.4f);
             recess = assets.Lit("PanelRecess", new Color(0.012f, 0.012f, 0.013f), 0.0f, 0.2f);
-            grip = assets.Lit("LeverGrip", new Color(0.09f, 0.09f, 0.095f), 0.0f, 0.3f, true);
+            grip = assets.Lit("LeverGrip", new Color(0.09f, 0.09f, 0.095f), 0.0f, 0.3f, assets.Knurl, 2f, true, 0.8f);
         }
 
         // ---------------------------------------------------------------- push button
