@@ -90,3 +90,9 @@ MonoBehaviour:
   masterAlarm:
     clip: {fileID: 8300000, guid: 2138e7db31af57c0d814e4412f9d0c3e, type: 3}
     volume: 0.38
+  breathingLoop:
+    clip: {fileID: 8300000, guid: 239cceb7c8276f7999e7bdb09428bfa5, type: 3}
+    volume: 0.5
+  radioStaticLoop:
+    clip: {fileID: 8300000, guid: d7573474b0d0503648e9cf3b87ba3953, type: 3}
+    volume: 0.12

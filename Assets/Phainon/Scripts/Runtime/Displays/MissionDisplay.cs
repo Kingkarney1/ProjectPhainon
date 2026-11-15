@@ -32,6 +32,9 @@ namespace Phainon.Displays
 
         [Header("Flight events")]
         [SerializeField] internal StatusRow[] eventRows;
+        [Tooltip("Section headings, renamed when the rows show a story mission's science and objectives.")]
+        [SerializeField] internal TMP_Text stagesTitle;
+        [SerializeField] internal TMP_Text eventsTitle;
 
         protected override void Start()
         {
@@ -52,17 +55,67 @@ namespace Phainon.Displays
                                + "    ALT " + Kilometres(craft.Flight.AltitudeMeters) + " KM";
             recordLamp.color = cameraOn && t.BlinkPhase(Time.unscaledTime * 0.5f) ? t.warningRed : t.gaugeTrack;
 
-            phaseTitle.text = mission.Spec.GetPhaseInfo(mission.Phase).title;
-            phaseTitle.color = mission.IsFailed ? t.warningRed : (mission.IsComplete ? t.nominalGreen : t.accentBlue);
+            phaseTitle.text = mission.PhaseTitle;
+            phaseTitle.color = mission.IsFailed ? t.warningRed : (mission.IsAccomplished ? t.nominalGreen : t.accentBlue);
             objective.text = mission.CurrentObjective;
             clock.text = mission.FormatClock();
 
             float fraction = (float)mission.Progress;
-            progress.Set(fraction, mission.IsFailed ? t.warningRed : (mission.IsComplete ? t.nominalGreen : t.accentBlue),
+            progress.Set(fraction, mission.IsFailed ? t.warningRed : (mission.IsAccomplished ? t.nominalGreen : t.accentBlue),
                 (fraction * 100f).ToString("0") + "%");
 
+            if (craft.Story != null)
+            {
+                RefreshScience(craft.Science);
+                RefreshObjectives(craft.Story);
+                return;
+            }
             RefreshStages(craft);
             RefreshEvents(mission);
+        }
+
+        /// <summary>On a story mission the three rows under the camera show the science payload.</summary>
+        private void RefreshScience(ScienceSystem science)
+        {
+            CockpitTheme t = Theme;
+            if (stagesTitle != null) stagesTitle.text = "SCIENCE PAYLOAD";
+            InstrumentSpec instrument = science.Selected;
+            boosterStatus.SetLabel(instrument != null ? instrument.name + "   " + (science.SelectedCondition * 100.0).ToString("0") + "%" : "NO INSTRUMENT");
+            boosterStatus.Set(science.StatusText, science.Recording ? t.nominalGreen : (science.Powered ? t.cautionAmber : t.textDim));
+
+            ObservationSpec shown = science.Active ?? science.NextFor(instrument);
+            upperStageStatus.SetLabel(shown != null ? shown.title.ToUpperInvariant() : "OBSERVATION");
+            if (science.Active != null) upperStageStatus.Set((science.ActiveProgress * 100.0).ToString("0") + "%", t.nominalGreen);
+            else upperStageStatus.Set(shown != null ? "NEXT" : "--", t.textDim);
+
+            separationStatus.SetLabel("DATA STORE");
+            separationStatus.Set(science.Transmitting
+                    ? "SENDING " + (science.TransmitProgress * 100.0).ToString("0") + "%"
+                    : science.TransmittedCount + " SENT OF " + science.CollectedCount,
+                science.CollectedCount > science.TransmittedCount ? t.cautionAmber : t.textPrimary);
+        }
+
+        /// <summary>On a story mission the event rows list the objectives around the current one.</summary>
+        private void RefreshObjectives(StoryController story)
+        {
+            CockpitTheme t = Theme;
+            if (eventsTitle != null) eventsTitle.text = "OBJECTIVES";
+            ObjectiveSpec[] objectives = story.Spec.objectives;
+            // Keep the current objective in view with a couple of finished ones above it.
+            int first = Mathf.Clamp(story.ObjectiveIndex - 2, 0, Mathf.Max(0, objectives.Length - eventRows.Length));
+            for (int i = 0; i < eventRows.Length; i++)
+            {
+                int index = first + i;
+                if (index >= objectives.Length)
+                {
+                    eventRows[i].gameObject.SetActive(false);
+                    continue;
+                }
+                eventRows[i].SetLabel(objectives[index].title.ToUpperInvariant());
+                if (index < story.ObjectiveIndex) { eventRows[i].Set("DONE", t.nominalGreen); eventRows[i].SetLabelColor(t.textDim); }
+                else if (index == story.ObjectiveIndex) { eventRows[i].Set("NOW", t.accentBlue); eventRows[i].SetLabelColor(t.textPrimary); }
+                else { eventRows[i].Set("--", t.textDim); eventRows[i].SetLabelColor(t.textDim); }
+            }
         }
 
         private void RefreshStages(Spacecraft craft)

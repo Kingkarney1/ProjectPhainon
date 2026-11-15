@@ -43,6 +43,9 @@ namespace Phainon.Cockpit
         /// <summary>True when holding the mouse and dragging adjusts the control.</summary>
         public virtual bool SupportsDrag { get { return false; } }
 
+        /// <summary>Puts the control in a position without reporting it, to match a flight that is already under way.</summary>
+        public virtual void SetWithoutNotify(float value) { }
+
         public virtual void OnPress() { }
         public virtual void OnDrag(Vector2 pixelDelta) { }
         public virtual void OnRelease() { }

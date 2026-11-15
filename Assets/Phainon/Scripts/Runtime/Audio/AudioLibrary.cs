@@ -48,5 +48,7 @@ namespace Phainon.Audio
         public SoundEntry windLoop = new SoundEntry { volume = 0.5f };
         public SoundEntry rcsLoop = new SoundEntry { volume = 0.3f };
         public SoundEntry masterAlarm = new SoundEntry { volume = 0.38f };
+        public SoundEntry breathingLoop = new SoundEntry { volume = 0.5f };
+        public SoundEntry radioStaticLoop = new SoundEntry { volume = 0.12f };
     }
 }

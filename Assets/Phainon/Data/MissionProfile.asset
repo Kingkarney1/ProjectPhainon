@@ -18,6 +18,8 @@ MonoBehaviour:
     countdownSeconds: 15
     ignitionWindowSeconds: 6
     liftoffThrustToWeight: 1.03
+    launchMinimumPropellantFraction: 0.97
+    padToppingFractionPerSecond: 0.004
     stageSeparationMinAltitudeMeters: 40000
     orbitMinPeriapsisMeters: 150000
     reentryFailAltitudeMeters: 60000

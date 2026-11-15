@@ -52,24 +52,45 @@ namespace Phainon.Displays
             SystemsSpec limits = craft.SystemsSpec;
             CockpitTheme t = Theme;
 
-            phaseText.text = mission.Spec.GetPhaseInfo(mission.Phase).title;
-            phaseText.color = mission.IsFailed ? t.warningRed : (mission.IsComplete ? t.nominalGreen : t.accentBlue);
+            phaseText.text = mission.PhaseTitle;
+            phaseText.color = mission.IsFailed ? t.warningRed : (mission.IsAccomplished ? t.nominalGreen : t.accentBlue);
             clockText.text = mission.FormatClock();
 
             altitude.Set(Kilometres(flight.AltitudeMeters));
             velocity.Set(flight.Speed.ToString("0"));
             verticalSpeed.Set(Signed(flight.VerticalSpeed, "0"), flight.VerticalSpeed < -5.0 ? t.cautionAmber : t.textPrimary);
-            downrange.Set(Kilometres(flight.DownrangeMeters));
+            bool story = craft.Story != null;
+            if (story)
+            {
+                // Away from Earth, how far round the planet matters less than how long until closest approach.
+                downrange.SetLabel("TIME TO PE", "");
+                downrange.Set(ScienceSystem.Duration(flight.TimeToPeriapsisSeconds));
+            }
+            else
+            {
+                downrange.Set(Kilometres(flight.DownrangeMeters));
+            }
 
             bool suborbital = flight.PeriapsisMeters < 0.0;
             apoapsis.Set(double.IsInfinity(flight.ApoapsisMeters) ? "ESCAPE" : Kilometres(System.Math.Max(0.0, flight.ApoapsisMeters)));
             periapsis.Set(suborbital ? "SUB" : Kilometres(flight.PeriapsisMeters), suborbital ? t.textDim : t.nominalGreen);
 
             gLoad.Set(flight.GLoad.ToString("0.00"), flight.GLoad > limits.maxGLoad ? t.warningRed : t.textPrimary);
-            double q = flight.DynamicPressurePa;
-            dynamicPressure.Set((q / 1000.0).ToString("0.0"),
-                q > limits.maxDynamicPressurePa ? t.warningRed : (q > limits.maxDynamicPressurePa * 0.85 ? t.cautionAmber : t.textPrimary));
-            mach.Set(flight.AirDensityFraction > 0.0005 ? flight.MachNumber.ToString("0.0") : "--");
+            if (story)
+            {
+                // There is no air here to measure. The two rows show the shape of the orbit instead.
+                dynamicPressure.SetLabel("ECCENTRIC", "");
+                dynamicPressure.Set(flight.Eccentricity.ToString("0.000"), flight.IsBound ? t.textPrimary : t.cautionAmber);
+                mach.SetLabel("PERIOD", "");
+                mach.Set(flight.IsBound ? ScienceSystem.Duration(flight.OrbitalPeriodSeconds) : "OPEN");
+            }
+            else
+            {
+                double q = flight.DynamicPressurePa;
+                dynamicPressure.Set((q / 1000.0).ToString("0.0"),
+                    q > limits.maxDynamicPressurePa ? t.warningRed : (q > limits.maxDynamicPressurePa * 0.85 ? t.cautionAmber : t.textPrimary));
+                mach.Set(flight.AirDensityFraction > 0.0005 ? flight.MachNumber.ToString("0.0") : "--");
+            }
 
             pitch.Set(Signed(craft.Attitude.PitchDegrees, "0.0"));
             roll.Set(Signed(craft.Attitude.RollDegrees, "0.0"));
@@ -80,6 +101,19 @@ namespace Phainon.Displays
             else guidanceStatus.Set("NO AUTHORITY", t.textDim);
 
             RefreshNavPage(craft, dt);
+
+            if (story)
+            {
+                // What it takes to stay, against what is in the tanks.
+                double need = craft.Story.CaptureDeltaV, have = craft.AvailableDeltaV;
+                orbitalVelocity.SetLabel("DELTA-V   TO CAPTURE / AVAILABLE");
+                orbitalVelocity.Set(have > 0.0 ? (float)(need / have) : 1f, need <= have ? t.nominalGreen : t.warningRed,
+                    need.ToString("0") + " / " + have.ToString("0") + " M/S");
+                if (craft.Story.OrbitStable) orbitStatus.Set("ORBIT GO", t.nominalGreen);
+                else if (flight.IsBound) orbitStatus.Set("CAPTURED", t.cautionAmber);
+                else orbitStatus.Set("FLYBY PATH", t.cautionAmber);
+                return;
+            }
 
             double fraction = flight.Speed / flight.CircularOrbitSpeed;
             orbitalVelocity.Set((float)fraction, mission.OrbitGo || mission.IsComplete ? t.nominalGreen : t.accentBlue,
@@ -137,7 +171,14 @@ namespace Phainon.Displays
 
         protected override void Animate(Spacecraft craft, float dt)
         {
-            attitude.Animate((float)craft.Attitude.PitchDegrees, (float)craft.Attitude.RollDegrees,
+            // Past the vertical the instrument shows the same attitude the other way up, as a real one does.
+            float pitchShown = (float)craft.Attitude.PitchDegrees, rollShown = (float)craft.Attitude.RollDegrees;
+            if (Mathf.Abs(pitchShown) > 90f)
+            {
+                pitchShown = Mathf.Sign(pitchShown) * 180f - pitchShown;
+                rollShown += 180f;
+            }
+            attitude.Animate(pitchShown, rollShown,
                 (float)craft.Flight.FlightPathAngleDegrees, craft.Flight.Speed > 20.0, dt);
         }
     }

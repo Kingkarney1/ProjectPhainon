@@ -27,6 +27,7 @@ namespace Phainon.Displays
         private readonly Vector2[] trackPoints = new Vector2[Capacity + 1];
         private readonly Vector2[] orbitPoints = new Vector2[OrbitSegments + 1];
         private int count;
+        private float bodyRadius = (float)FlightModel.EarthRadius;
         private float sinceSample;
         private float interval;
 
@@ -47,8 +48,18 @@ namespace Phainon.Displays
             samples[count++] = new Vector2((float)flight.DownrangeAngle, (float)flight.AltitudeMeters);
         }
 
+        // Radius, in metres, that reaches the edge of the map. Zero means the exaggerated low-orbit view.
+        private float fitRadius;
+
         public void Redraw(FlightModel flight)
         {
+            bodyRadius = (float)flight.Body.radiusMeters;
+            // Far from the body, or around a giant, the map is drawn to scale and sized to hold the orbit.
+            bool toScale = flight.Body.radiusMeters > FlightModel.EarthRadius * 2.0;
+            float reach = (float)System.Math.Max(flight.Radius, flight.IsBound ? flight.Body.radiusMeters + flight.ApoapsisMeters : 0.0);
+            fitRadius = toScale ? Mathf.Max(bodyRadius * 3f, reach * 1.08f) : 0f;
+            if (toScale) earthRadius = Mathf.Max(0.02f, 0.94f * bodyRadius / fitRadius);
+
             earth.anchorMin = new Vector2(0.5f - earthRadius * 0.5f, 0.5f - earthRadius * 0.5f);
             earth.anchorMax = new Vector2(0.5f + earthRadius * 0.5f, 0.5f + earthRadius * 0.5f);
 
@@ -79,7 +90,7 @@ namespace Phainon.Displays
             {
                 double anomaly = i * (2.0 * System.Math.PI / OrbitSegments);
                 double radius = p / (1.0 + e * System.Math.Cos(anomaly));
-                double altitude = System.Math.Max(0.0, radius - FlightModel.EarthRadius);
+                double altitude = System.Math.Max(0.0, radius - flight.Body.radiusMeters);
                 orbitPoints[i] = Project((float)(periapsisAngle + anomaly), (float)altitude);
             }
             orbit.SetPoints(orbitPoints, OrbitSegments + 1);
@@ -89,7 +100,9 @@ namespace Phainon.Displays
         private Vector2 Project(float downrangeAngle, float altitudeMeters)
         {
             // Far from Earth the true position is off the map; it is held at the rim.
-            float radius = Mathf.Min(0.49f, earthRadius * 0.5f * (1f + altitudeMeters / (float)FlightModel.EarthRadius * altitudeExaggeration));
+            float radius = fitRadius > 0f
+                ? Mathf.Min(0.49f, 0.47f * (bodyRadius + altitudeMeters) / fitRadius)
+                : Mathf.Min(0.49f, earthRadius * 0.5f * (1f + altitudeMeters / bodyRadius * altitudeExaggeration));
             float angle = Mathf.PI * 0.5f - downrangeAngle;
             return new Vector2(0.5f + Mathf.Cos(angle) * radius, 0.5f + Mathf.Sin(angle) * radius);
         }

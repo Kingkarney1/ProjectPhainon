@@ -15,6 +15,8 @@ MonoBehaviour:
   spec:
     replyWindowSeconds: 40
     staleAfterSeconds: 90
+    groundReactsAfterLightTime: 0
+    timeAccelerationWhileAwaiting: 0
     characters:
     - id: flight
       name: Mara Okafor
@@ -50,6 +52,13 @@ MonoBehaviour:
         line: Meridian, Phainon. Reading you fine. What is the status on your side?
         setsFlag: asked_status
         followUp: comm_check_status
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: comm_check_ack
       speaker: capcom
       trigger: 0
@@ -60,6 +69,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Copy, Phainon. Good signal here too. We are with you all the way up.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: comm_check_status
       speaker: flight
       trigger: 0
@@ -70,6 +86,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Flight. The range is clear and the team is at their consoles. We are waiting on your board.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: comm_check_silent
       speaker: capcom
       trigger: 18
@@ -80,6 +103,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Meridian. No copy on your last. We will keep the channel open.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: nav_aligned
       speaker: guidance
       trigger: 3
@@ -90,6 +120,13 @@ MonoBehaviour:
       forbidsFlag: '@guidance_active'
       text: Phainon, Guidance. We see your platform aligned. NAV MODE to ASCENT and GUIDANCE on when you are ready.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: go_poll
       speaker: flight
       trigger: 4
@@ -100,6 +137,13 @@ MonoBehaviour:
       forbidsFlag: '@counting'
       text: Phainon, Flight. I have polled the room and every station is go. Your board is green. Start the launch sequence when you are ready.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: count_started
       speaker: capcom
       trigger: 5
@@ -110,6 +154,13 @@ MonoBehaviour:
       forbidsFlag: '@lifted_off'
       text: The clock is running. Throttle to full, and ignite in the window at T minus {window}.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: count_hold
       speaker: flight
       trigger: 6
@@ -120,6 +171,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Flight. We see the hold. Clear the no-go item on your board and the count will pick up.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: ignition
       speaker: propulsion
       trigger: 7
@@ -130,6 +188,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Propulsion sees ignition. Chamber pressure is coming up.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: liftoff
       speaker: capcom
       trigger: 8
@@ -140,6 +205,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Liftoff. Phainon has cleared the tower. Good luck.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: max_q
       speaker: guidance
       trigger: 9
@@ -150,6 +222,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, you are through max-Q at {alt} kilometres. Throttle up when you are ready.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: booster_cutoff
       speaker: capcom
       trigger: 10
@@ -160,6 +239,13 @@ MonoBehaviour:
       forbidsFlag: '@upper_stage'
       text: Booster cutoff confirmed. Lift the guard and separate the stage.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: separation
       speaker: guidance
       trigger: 11
@@ -170,6 +256,13 @@ MonoBehaviour:
       forbidsFlag: '@burning'
       text: Clean separation at {alt} kilometres. Light the upper stage.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: upper_ignition
       speaker: propulsion
       trigger: 12
@@ -180,6 +273,13 @@ MonoBehaviour:
       forbidsFlag: '@in_orbit'
       text: Upper stage is burning with good chamber pressure. Hold the burn until Guidance calls orbit.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: orbit_go
       speaker: guidance
       trigger: 13
@@ -190,6 +290,13 @@ MonoBehaviour:
       forbidsFlag: '@in_orbit'
       text: Phainon, Guidance. Periapsis is above the atmosphere. You are go for cutoff.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_max_q
       speaker: propulsion
       trigger: 16
@@ -200,6 +307,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Propulsion. Dynamic pressure is over the limit. Ease the throttle back until the warning clears.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_g
       speaker: surgeon
       trigger: 16
@@ -210,6 +324,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Surgeon. The G load is over the limit for the crew. Bring the throttle down, please.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_fuel
       speaker: propulsion
       trigger: 16
@@ -220,6 +341,13 @@ MonoBehaviour:
       forbidsFlag: '@in_orbit'
       text: 'Phainon, Propulsion. Upper stage is at {fuel} percent. Keep the burn going: you need all of it for orbit.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_apu
       speaker: propulsion
       trigger: 16
@@ -230,6 +358,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: 'Phainon, Propulsion. The APU is offline. You are on batteries and you have lost engine gimbal. Cycle the APU switch: off, then on.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_flameout
       speaker: propulsion
       trigger: 16
@@ -240,6 +375,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Propulsion. We saw the engine flame out on feed pressure. Check FUEL PUMP and TANK PRESS, then relight.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_sink
       speaker: guidance
       trigger: 16
@@ -250,6 +392,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Guidance. You are sinking at {alt} kilometres. Pitch up and add thrust now.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: warn_cabin
       speaker: surgeon
       trigger: 16
@@ -260,6 +409,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Surgeon. Cabin pressure is dropping. Check that CABIN SYS is on.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: fault_pump
       speaker: propulsion
       trigger: 19
@@ -270,6 +426,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Propulsion. Feed pressure is sagging on a pump fault. Cycle FUEL PUMP, off and straight back on, before the engine starves.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: fault_battery
       speaker: capcom
       trigger: 19
@@ -280,6 +443,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: 'Phainon, Meridian. Battery A has shorted and it is dragging the bus down. Isolate it: BATT A off. You are fine on B and the APU.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: fault_nav
       speaker: guidance
       trigger: 19
@@ -290,6 +460,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Guidance. Your platform has dropped out and guidance is not steering. Press NAV SYSTEM to realign, and hold attitude by hand until it is back.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: fault_engine
       speaker: propulsion
       trigger: 19
@@ -300,6 +477,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Propulsion. The engine is only making {thrust} percent. There is nothing to fix from the seat. Keep the throttle up; the burn will run long.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: cleared_apu
       speaker: propulsion
       trigger: 20
@@ -310,6 +494,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: APU is back on the bus and you have gimbal again. Nicely done.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: cleared_pump
       speaker: propulsion
       trigger: 20
@@ -320,6 +511,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Feed pressure is back in the green. Good catch, Phainon.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: cleared_battery
       speaker: capcom
       trigger: 20
@@ -330,6 +528,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: We see battery A off the bus and the load back to normal. Leave it isolated.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: cleared_nav
       speaker: guidance
       trigger: 20
@@ -340,6 +545,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Platform is realigned and guidance has the vehicle again.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: cleared_antenna
       speaker: capcom
       trigger: 20
@@ -350,6 +562,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: That was your transmitter, not us. Good recovery.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: link_restored
       speaker: capcom
       trigger: 2
@@ -360,6 +579,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Meridian. We have you back. You dropped off our screens for a while.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: mission_failed
       speaker: flight
       trigger: 15
@@ -370,6 +596,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Flight. We have lost the mission. Safe the vehicle. We will go through the data together.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: orbit
       speaker: flight
       trigger: 14
@@ -380,6 +613,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: 'Phainon, Flight. Welcome to orbit: {peri} by {apo} kilometres. You were loud and clear on the pad and you flew it the same way. Outstanding.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: orbit
       speaker: flight
       trigger: 14
@@ -390,6 +630,13 @@ MonoBehaviour:
       forbidsFlag: crew_talkative
       text: Phainon, Flight. Orbit confirmed at {peri} by {apo} kilometres. Well flown.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: crew_check
       speaker: surgeon
       trigger: 17
@@ -408,6 +655,13 @@ MonoBehaviour:
         line: Surgeon, Phainon. A little shaken, but we are fine.
         setsFlag: crew_shaken
         followUp: crew_check_shaken
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: crew_check_well
       speaker: surgeon
       trigger: 0
@@ -418,6 +672,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Copy. Your vitals agree with you. Enjoy it.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: crew_check_shaken
       speaker: surgeon
       trigger: 0
@@ -428,6 +689,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Understood. Take ten minutes before any more work. Flight has agreed to hold the timeline.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: extend
       speaker: flight
       trigger: 17
@@ -446,6 +714,13 @@ MonoBehaviour:
         line: Flight, Phainon. We are happy to call it there.
         setsFlag: stand_down
         followUp: extend_no
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: extend_yes
       speaker: guidance
       trigger: 0
@@ -456,6 +731,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Copy, go for departure. Drop the upper stage. NAV MODE to ORBIT with GUIDANCE and RCS on, then light the service module and hold the burn until apoapsis reads ESCAPE.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: extend_no
       speaker: flight
       trigger: 0
@@ -466,6 +748,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Agreed, and the Surgeon will be glad to hear it. Good work today, Phainon. The service module stays fuelled if you change your mind.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: extend_no
       speaker: flight
       trigger: 0
@@ -476,6 +765,13 @@ MonoBehaviour:
       forbidsFlag: crew_shaken
       text: Copy, standing down. Good work today, Phainon. The service module stays fuelled if you change your mind.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: jettison
       speaker: propulsion
       trigger: 21
@@ -486,6 +782,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Upper stage is away and clear. Service module shows {fuel} percent and a good feed.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: departure_burn
       speaker: guidance
       trigger: 22
@@ -496,6 +799,13 @@ MonoBehaviour:
       forbidsFlag: '@escaped'
       text: Good burn, Phainon. The far side of your orbit is climbing. Hold it until apoapsis reads ESCAPE.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: escape
       speaker: flight
       trigger: 23
@@ -506,6 +816,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Flight. You are on an escape trajectory at {vel} metres per second. You are no longer in orbit around the Earth. This is what we came for.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: escape
       speaker: flight
       trigger: 23
@@ -516,6 +833,13 @@ MonoBehaviour:
       forbidsFlag: extend_mission
       text: Phainon, Flight. We show you on an escape trajectory at {vel} metres per second. That was not in today's plan, but we are with you. Cut the engine when you are happy.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: dist_10k
       speaker: capcom
       trigger: 24
@@ -526,6 +850,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Meridian. {dist} kilometres out. The whole Earth should fit in your window now.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: dist_100k
       speaker: guidance
       trigger: 24
@@ -536,6 +867,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Phainon, Guidance. {dist} kilometres. Your signal now takes {delay} seconds to reach us, so expect a pause before we answer.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: coast_check
       speaker: surgeon
       trigger: 24
@@ -554,6 +892,13 @@ MonoBehaviour:
         line: Surgeon, Phainon. Honestly, missing home a little.
         setsFlag: coast_homesick
         followUp: coast_check_homesick
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: coast_check_content
       speaker: surgeon
       trigger: 0
@@ -564,6 +909,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: Good. Sleep when you can. We will keep the calls short.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: coast_check_homesick
       speaker: surgeon
       trigger: 0
@@ -574,6 +926,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: That is the healthy answer. Home can still hear you, and we are not going anywhere.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: dist_moon
       speaker: flight
       trigger: 24
@@ -584,6 +943,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: 'Phainon, Flight. You have just passed the distance of the Moon''s orbit: {dist} kilometres. Nobody has flown this ship farther.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: dist_1m
       speaker: flight
       trigger: 24
@@ -594,6 +960,13 @@ MonoBehaviour:
       forbidsFlag: 
       text: One million kilometres, Phainon. Earth is a blue point behind you, and everyone on it who knows your name is listening. We are still here.
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0
     - id: dist_1m
       speaker: flight
       trigger: 24
@@ -604,3 +977,10 @@ MonoBehaviour:
       forbidsFlag: coast_homesick
       text: 'One million kilometres, Phainon. Earth is a blue point behind you. Our trajectory data ends here: you are flying off the edge of our charts.'
       replies: []
+      storyEvent: 
+      logged: 0
+      garbled: 0
+      requestLabel: 
+      requestLine: 
+      setsFlag: 
+      alreadyOnItsWay: 0

@@ -83,6 +83,15 @@ namespace Phainon.Environment
             if (servicePlumes == null) servicePlumes = new Renderer[0];
             serviceRestScales = RestScales(servicePlumes);
             spacecraft.Craft.Engine.StageSeparated += OnStageSeparated;
+
+            // A flight that starts in space left its lower stages behind long ago.
+            int stage = spacecraft.Craft.Engine.ActiveStage;
+            if (stage > 0)
+            {
+                boosterReleased = true;
+                if (booster != null) booster.gameObject.SetActive(false);
+            }
+            if (stage > 1 && upperStage != null) upperStage.gameObject.SetActive(false);
         }
 
         private void OnDestroy()

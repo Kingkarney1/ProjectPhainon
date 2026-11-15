@@ -36,7 +36,11 @@ namespace Phainon.Simulation
         DepartureBurn = 22,
         EarthEscape = 23,
         /// <summary>A distance from Earth was passed. Lines choose theirs with the @km:&lt;distance&gt; condition.</summary>
-        DistanceMark = 24
+        DistanceMark = 24,
+        /// <summary>Something happened in a story mission; see <see cref="CommsLine.storyEvent"/>.</summary>
+        StoryEvent = 25,
+        /// <summary>Never sent unprompted: the answer to a call the crew choose to make. See <see cref="CommsLine.requestLabel"/>.</summary>
+        CrewRequest = 26
     }
 
     [Serializable]
@@ -108,6 +112,23 @@ namespace Phainon.Simulation
         public string forbidsFlag;
         public string text;
         public CommsReply[] replies;
+        /// <summary>Which story event, when the trigger is StoryEvent: "wake", "objective:&lt;id&gt;", "observation:&lt;id&gt;", "sent:&lt;id&gt;", "mission_complete".</summary>
+        public string storyEvent;
+        /// <summary>True if the transmission is kept in the crew's log.</summary>
+        public bool logged;
+        /// <summary>True if the transmission arrived damaged. The log marks it as not to be relied on.</summary>
+        public bool garbled;
+        /// <summary>For a CrewRequest line: the short name of the call the crew can make.</summary>
+        public string requestLabel;
+        /// <summary>For a CrewRequest line: what the crew transmit.</summary>
+        public string requestLine;
+        /// <summary>Story flag set when the crew hear this line.</summary>
+        public string setsFlag;
+        /// <summary>
+        /// True for a transmission that was sent before the ground could know anything, such as an
+        /// automatic beacon: it arrives after its delay alone, with no round trip added.
+        /// </summary>
+        public bool alreadyOnItsWay;
 
         public CommsLine() { }
         public CommsLine(string id, string speaker, CommsTrigger trigger, double delaySeconds, string text)
@@ -124,6 +145,12 @@ namespace Phainon.Simulation
         public CommsLine Requires(string flag) { requiresFlag = flag; return this; }
         public CommsLine Forbids(string flag) { forbidsFlag = flag; return this; }
         public CommsLine WithReplies(params CommsReply[] options) { replies = options; return this; }
+        public CommsLine OnStory(string eventId) { storyEvent = eventId; return this; }
+        public CommsLine Logged() { logged = true; return this; }
+        public CommsLine Garbled() { garbled = true; logged = true; return this; }
+        public CommsLine AsRequest(string label, string line) { requestLabel = label; requestLine = line; return this; }
+        public CommsLine Sets(string flag) { setsFlag = flag; return this; }
+        public CommsLine AlreadyOnItsWay() { alreadyOnItsWay = true; return this; }
     }
 
     /// <summary>Everything Ground Control can say on a mission: who is on the loop and their lines.</summary>
@@ -134,6 +161,13 @@ namespace Phainon.Simulation
         public double replyWindowSeconds = 40;
         /// <summary>A transmission that cannot get through for this long is abandoned.</summary>
         public double staleAfterSeconds = 90;
+        /// <summary>
+        /// True when the ground only learns what happened aboard after the signal has crossed the
+        /// distance, so its reaction arrives a full round trip after the event.
+        /// </summary>
+        public bool groundReactsAfterLightTime;
+        /// <summary>True lets the crew speed time up with a question still open; it then lapses unanswered.</summary>
+        public bool timeAccelerationWhileAwaiting;
 
         public CommsCharacter[] characters = DefaultCharacters();
         public CommsLine[] lines = DefaultLines();

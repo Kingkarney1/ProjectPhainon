@@ -2,13 +2,26 @@ using System;
 
 namespace Phainon.Simulation
 {
+    /// <summary>What the flight model needs written down to carry on later from the same place.</summary>
+    [Serializable]
+    public class FlightSnapshot
+    {
+        public bool released;
+        public bool impacted;
+        public double altitude;
+        public double radialVelocity;
+        public double tangentialVelocity;
+        public double downrangeAngle;
+    }
+
     /// <summary>
-    /// Planar point-mass flight model over a round, non-rotating Earth.
+    /// Planar point-mass flight model around one round, non-rotating body.
     /// State is altitude plus radial and tangential velocity; thrust acts along the pitch angle.
     /// It is a believable approximation, not a full orbital mechanics solver.
     /// </summary>
     public class FlightModel
     {
+        // Earth's values, kept as constants for the code that is only ever about Earth.
         public const double EarthMu = 3.986004418e14;       // m^3/s^2
         public const double EarthRadius = 6371000.0;        // m
         public const double SeaLevelDensity = 1.225;        // kg/m^3
@@ -16,8 +29,16 @@ namespace Phainon.Simulation
         private const double MaxStep = 0.02;                // s, integration sub-step
 
         private readonly VehicleSpec vehicle;
+        private readonly BodySpec body;
 
-        public FlightModel(VehicleSpec vehicle) { this.vehicle = vehicle; }
+        public FlightModel(VehicleSpec vehicle, BodySpec body = null)
+        {
+            this.vehicle = vehicle;
+            this.body = body ?? BodySpec.Earth();
+        }
+
+        /// <summary>The body whose gravity and atmosphere act on the vehicle.</summary>
+        public BodySpec Body { get { return body; } }
 
         /// <summary>False while the vehicle is held on the pad by the launch clamps.</summary>
         public bool Released { get; private set; }
@@ -26,29 +47,51 @@ namespace Phainon.Simulation
         public double AltitudeMeters { get; private set; }
         public double RadialVelocity { get; private set; }
         public double TangentialVelocity { get; private set; }
-        /// <summary>Angle travelled around the Earth since launch, in radians.</summary>
+        /// <summary>Angle travelled around the body since the start of the flight, in radians.</summary>
         public double DownrangeAngle { get; private set; }
-        public double DownrangeMeters { get { return DownrangeAngle * EarthRadius; } }
+        public double DownrangeMeters { get { return DownrangeAngle * body.radiusMeters; } }
 
         public double Speed { get { return Math.Sqrt(RadialVelocity * RadialVelocity + TangentialVelocity * TangentialVelocity); } }
         public double VerticalSpeed { get { return RadialVelocity; } }
-        public double Radius { get { return EarthRadius + AltitudeMeters; } }
+        public double Radius { get { return body.radiusMeters + AltitudeMeters; } }
         public double MassKg { get; private set; }
         public double DynamicPressurePa { get; private set; }
         /// <summary>Acceleration felt by the crew, in g.</summary>
         public double GLoad { get; private set; }
+        /// <summary>Far point of the orbit above the surface. Infinite on an escape path.</summary>
         public double ApoapsisMeters { get; private set; }
+        /// <summary>Near point of the orbit above the surface, on a closed orbit or an escape path alike.</summary>
         public double PeriapsisMeters { get; private set; }
         /// <summary>Semi-major axis of the current orbit in metres. Infinite on an escape trajectory.</summary>
         public double SemiMajorAxis { get; private set; }
         public double Eccentricity { get; private set; }
-        /// <summary>Angle from periapsis to the vehicle along the orbit, in radians.</summary>
+        /// <summary>
+        /// Angle from periapsis to the vehicle along the orbit, in radians: 0 to 2 pi on a closed
+        /// orbit, negative on the way in along an escape path and positive on the way out.
+        /// </summary>
         public double TrueAnomaly { get; private set; }
-        public double AirDensityFraction { get { return Math.Exp(-AltitudeMeters / ScaleHeight); } }
+        /// <summary>Specific orbital energy, v^2/2 - mu/r. Negative on a closed orbit.</summary>
+        public double SpecificEnergy { get; private set; }
+        public bool IsBound { get { return SpecificEnergy < 0.0; } }
+        /// <summary>Time for one orbit in seconds. Infinite on an escape path.</summary>
+        public double OrbitalPeriodSeconds
+        {
+            get { return IsBound ? OrbitMath.Period(body.mu, SemiMajorAxis) : double.PositiveInfinity; }
+        }
+        /// <summary>Seconds to the next periapsis; NaN when there will not be one.</summary>
+        public double TimeToPeriapsisSeconds
+        {
+            get { return OrbitMath.TimeToPeriapsis(body.mu, SpecificEnergy, Eccentricity, TrueAnomaly); }
+        }
+
+        public double AirDensityFraction
+        {
+            get { return body.surfaceDensity > 0.0 ? Math.Exp(-AltitudeMeters / body.scaleHeightMeters) : 0.0; }
+        }
         public double MachNumber { get { return Speed / SpeedOfSound(AltitudeMeters); } }
 
         /// <summary>Speed of a circular orbit at the current altitude.</summary>
-        public double CircularOrbitSpeed { get { return Math.Sqrt(EarthMu / Radius); } }
+        public double CircularOrbitSpeed { get { return Math.Sqrt(body.mu / Radius); } }
 
         /// <summary>Angle of the velocity vector above the local horizon, in degrees.</summary>
         public double FlightPathAngleDegrees
@@ -57,6 +100,39 @@ namespace Phainon.Simulation
         }
 
         public void ReleaseClamps() { Released = true; }
+
+        /// <summary>Places the vehicle in free flight. Used when a mission starts away from the pad.</summary>
+        public void SetState(double altitudeMeters, double radialVelocity, double tangentialVelocity, double downrangeAngle)
+        {
+            Released = true;
+            Impacted = false;
+            AltitudeMeters = altitudeMeters;
+            RadialVelocity = radialVelocity;
+            TangentialVelocity = tangentialVelocity;
+            DownrangeAngle = downrangeAngle;
+            GLoad = 0.0;
+            UpdateOrbit();
+        }
+
+        public FlightSnapshot Capture()
+        {
+            return new FlightSnapshot
+            {
+                released = Released, impacted = Impacted, altitude = AltitudeMeters,
+                radialVelocity = RadialVelocity, tangentialVelocity = TangentialVelocity, downrangeAngle = DownrangeAngle
+            };
+        }
+
+        public void Restore(FlightSnapshot s)
+        {
+            Released = s.released;
+            Impacted = s.impacted;
+            AltitudeMeters = s.altitude;
+            RadialVelocity = s.radialVelocity;
+            TangentialVelocity = s.tangentialVelocity;
+            DownrangeAngle = s.downrangeAngle;
+            UpdateOrbit();
+        }
 
         /// <summary>Total vehicle mass for a given active stage and propellant state.</summary>
         public double ComputeMass(int activeStage, FuelSystem fuel)
@@ -83,8 +159,8 @@ namespace Phainon.Simulation
         {
             double r = Radius;
             double v = Speed;
-            double gravity = EarthMu / (r * r);
-            double density = SeaLevelDensity * Math.Exp(-AltitudeMeters / ScaleHeight);
+            double gravity = body.mu / (r * r);
+            double density = body.surfaceDensity > 0.0 ? body.surfaceDensity * Math.Exp(-AltitudeMeters / body.scaleHeightMeters) : 0.0;
             double q = 0.5 * density * v * v;
             double drag = q * vehicle.dragAreaCd;
             DynamicPressurePa = q;
@@ -132,38 +208,41 @@ namespace Phainon.Simulation
             }
         }
 
-        /// <summary>Derives apoapsis and periapsis from specific energy and angular momentum.</summary>
+        /// <summary>Derives the orbit's shape from specific energy and angular momentum.</summary>
         private void UpdateOrbit()
         {
+            double mu = body.mu;
             double r = Radius;
             double v = Speed;
-            double energy = v * v * 0.5 - EarthMu / r;
+            double energy = v * v * 0.5 - mu / r;
             double momentum = r * TangentialVelocity;
+            double eccentricity = Math.Sqrt(Math.Max(0.0, 1.0 + 2.0 * energy * momentum * momentum / (mu * mu)));
+            // Semi-latus rectum: the one size that means the same thing on a closed orbit and an open one.
+            double p = momentum * momentum / mu;
+
+            SpecificEnergy = energy;
+            Eccentricity = eccentricity;
+            PeriapsisMeters = p / (1.0 + eccentricity) - body.radiusMeters;
 
             if (energy >= 0.0)
             {
                 ApoapsisMeters = double.PositiveInfinity;
-                PeriapsisMeters = AltitudeMeters;
                 SemiMajorAxis = double.PositiveInfinity;
-                Eccentricity = 1.0;
-                TrueAnomaly = 0.0;
-                return;
             }
-
-            double semiMajor = -EarthMu / (2.0 * energy);
-            double eccentricity = Math.Sqrt(Math.Max(0.0, 1.0 + 2.0 * energy * momentum * momentum / (EarthMu * EarthMu)));
-            ApoapsisMeters = semiMajor * (1.0 + eccentricity) - EarthRadius;
-            PeriapsisMeters = semiMajor * (1.0 - eccentricity) - EarthRadius;
-            SemiMajorAxis = semiMajor;
-            Eccentricity = eccentricity;
+            else
+            {
+                double semiMajor = -mu / (2.0 * energy);
+                ApoapsisMeters = semiMajor * (1.0 + eccentricity) - body.radiusMeters;
+                SemiMajorAxis = semiMajor;
+            }
 
             // True anomaly from the orbit equation r = p / (1 + e cos v); climbing means past periapsis.
             if (eccentricity > 1e-5)
             {
-                double p = semiMajor * (1.0 - eccentricity * eccentricity);
                 double cos = SimMath.Clamp((p / r - 1.0) / eccentricity, -1.0, 1.0);
                 double anomaly = Math.Acos(cos);
-                TrueAnomaly = RadialVelocity >= 0.0 ? anomaly : 2.0 * Math.PI - anomaly;
+                if (RadialVelocity >= 0.0) TrueAnomaly = anomaly;
+                else TrueAnomaly = energy >= 0.0 ? -anomaly : 2.0 * Math.PI - anomaly;
             }
             else
             {

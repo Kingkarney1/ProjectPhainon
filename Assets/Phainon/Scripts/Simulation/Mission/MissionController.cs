@@ -3,6 +3,18 @@ using System.Collections.Generic;
 
 namespace Phainon.Simulation
 {
+    [Serializable]
+    public class MissionSnapshot
+    {
+        public int phase, launchState;
+        public double countdown, met, peakDynamicPressure;
+        public bool orbitGo, hasEscaped, departureBurnCalled;
+        public string failureReason;
+        public int nextDistanceMark;
+        public int[] eventStatus = new int[0];
+        public double[] eventMet = new double[0];
+    }
+
     /// <summary>
     /// Structured mission flow: the pre-launch GO / NO-GO board, the launch sequencer, phase
     /// transitions from the pad to orbit, the flight-event timeline and the failure cases.
@@ -41,9 +53,31 @@ namespace Phainon.Simulation
         public bool OrbitGo { get; private set; }
         public bool IsComplete { get { return Phase == MissionPhase.OuterSpace; } }
         public bool IsFailed { get { return Phase == MissionPhase.Failed; } }
+        /// <summary>True once what the flight set out to do is done: orbit on the launch, the last objective in a story mission.</summary>
+        public bool IsAccomplished { get { return craft.Story != null ? craft.Story.IsComplete : IsComplete; } }
         /// <summary>True once the vehicle has more than enough speed to never fall back to Earth.</summary>
         public bool HasEscaped { get; private set; }
         public string FailureReason { get; private set; }
+
+        /// <summary>Heading for the current part of the flight: the phase, or the story's own stage when one is running.</summary>
+        public string PhaseTitle
+        {
+            get
+            {
+                if (craft.Story != null && Phase != MissionPhase.Failed) return craft.Story.StageTitle;
+                return spec.GetPhaseInfo(Phase).title;
+            }
+        }
+
+        /// <summary>Mission time at which orbit was achieved, or the current time if it has not been.</summary>
+        public double OrbitAchievedMetSeconds
+        {
+            get
+            {
+                MissionEvent achieved = GetEvent(MissionEventId.OrbitAchieved);
+                return achieved != null && achieved.Status == MissionEventStatus.Done ? achieved.MetSeconds : MissionElapsedSeconds;
+            }
+        }
 
         public IReadOnlyList<ChecklistItem> Checklist { get { return checklist; } }
         public IReadOnlyList<MissionEvent> Events { get { return events; } }
@@ -146,17 +180,51 @@ namespace Phainon.Simulation
 
         // ---------------------------------------------------------------- simulation
 
+        /// <summary>
+        /// Starts the mission already in space, with the launch behind it. Used by flights that
+        /// begin away from the pad; nothing is announced, because none of it happened on this flight.
+        /// </summary>
+        public void BeginInFlight(double missionElapsedSeconds)
+        {
+            LaunchState = LaunchSequenceState.Complete;
+            CountdownRemaining = 0.0;
+            MissionElapsedSeconds = missionElapsedSeconds;
+            for (int i = 0; i < events.Count; i++) events[i].Status = MissionEventStatus.Done;
+            Phase = MissionPhase.OuterSpace;
+            HasEscaped = !craft.Flight.IsBound;
+            departureBurnCalled = true;
+            nextDistanceMark = int.MaxValue;
+            RefreshChecklist();
+            UpdateObjective();
+        }
+
         /// <summary>Runs before the engine tick so the ignition interlock is current.</summary>
         public void PreTick(double dt)
         {
+            if (Phase == MissionPhase.PreLaunch) TickPadTopping(dt);
             RefreshChecklist();
             if (Phase == MissionPhase.PreLaunch) TickLaunchSequence(dt);
+        }
+
+        /// <summary>
+        /// On the pad with the engine off, the ground supply keeps the ascent stages full. That is
+        /// what makes a count that was held after ignition recoverable.
+        /// </summary>
+        private void TickPadTopping(double dt)
+        {
+            if (HasLiftedOff || craft.Engine.IsBurning || craft.Engine.ThrustNewtons > 0.0) return;
+            double amount = spec.padToppingFractionPerSecond * dt;
+            craft.Fuel.TopUp(0, amount);
+            craft.Fuel.TopUp(1, amount);
         }
 
         /// <summary>Runs after flight integration to evaluate phase transitions.</summary>
         public void PostTick(double dt)
         {
             if (HasLiftedOff && Phase != MissionPhase.Failed) MissionElapsedSeconds += dt;
+
+            if (HasLiftedOff && Phase != MissionPhase.Failed && craft.LifeSupport.CrewIncapacitated)
+                Fail("The cabin could no longer keep the crew alive.");
 
             switch (Phase)
             {
@@ -180,6 +248,12 @@ namespace Phainon.Simulation
                 LaunchState = LaunchSequenceState.Hold;
                 holdItem = FirstNoGo();
                 Notify("HOLD - " + holdItem.Label + " NO-GO");
+                // A running engine is shut down on a hold, or it would burn the launch load away on the pad.
+                if (craft.Engine.IsBurning)
+                {
+                    craft.Engine.Cutoff(EngineShutdownReason.Abort);
+                    Notify("ENGINE SHUT DOWN FOR THE HOLD");
+                }
             }
             else if (LaunchState == LaunchSequenceState.Hold && go)
             {
@@ -310,7 +384,8 @@ namespace Phainon.Simulation
             if (!HasEscaped && double.IsInfinity(flight.ApoapsisMeters))
             {
                 HasEscaped = true;
-                Announce(MissionEventId.EarthEscape, "EARTH ESCAPE VELOCITY");
+                // A story flight has its own way of saying where the vehicle is going.
+                if (craft.Story == null) Announce(MissionEventId.EarthEscape, "EARTH ESCAPE VELOCITY");
             }
             else if (HasEscaped && !double.IsInfinity(flight.ApoapsisMeters) && !craft.Engine.IsBurning)
             {
@@ -337,9 +412,12 @@ namespace Phainon.Simulation
         private bool CheckTrajectoryLoss()
         {
             FlightModel flight = craft.Flight;
-            if (flight.Impacted || (flight.AltitudeMeters < spec.reentryFailAltitudeMeters && flight.VerticalSpeed < 0))
+            double floor = flight.Body.destructionAltitudeMeters > 0.0 ? flight.Body.destructionAltitudeMeters : spec.reentryFailAltitudeMeters;
+            if (flight.Impacted || (flight.AltitudeMeters < floor && flight.VerticalSpeed < 0))
             {
-                Fail("The trajectory decayed and the vehicle fell back into the atmosphere.");
+                Fail(craft.Story != null
+                    ? "The path dipped into the atmosphere of " + flight.Body.name + " and the spacecraft was lost."
+                    : "The trajectory decayed and the vehicle fell back into the atmosphere.");
                 return true;
             }
             return false;
@@ -394,7 +472,7 @@ namespace Phainon.Simulation
             Add("BATTERIES", "Set the BATT A and BATT B switches ON. They are on the overhead panel (key 6).", ControlId.BatteryA);
             Add("MAIN BUS", "Press MAIN POWER to energise the main bus.", ControlId.MainPower);
             Add("AUX POWER", "Set the APU switch ON (overhead panel, key 6) and wait for it to come online.", ControlId.Apu);
-            Add("PROPELLANT", "Propellant load is below launch minimum.", ControlId.None);
+            Add("PROPELLANT", "Propellant load is below launch minimum. The ground supply is topping the tanks.", ControlId.None);
             Add("FUEL FEED", "Set FUEL PUMP and TANK PRESS ON and wait for feed pressure.", ControlId.FuelPump);
             Add("NAV PLATFORM", "Press NAV SYSTEM and wait for the platform to align.", ControlId.NavSystem);
             Add("NAV MODE", "Turn the NAV MODE dial to ASCENT.", ControlId.NavMode);
@@ -415,15 +493,16 @@ namespace Phainon.Simulation
             Set(1, power.IsBusPowered, "OFF");
             Set(2, power.ApuOnline, power.ApuEnabled && power.IsBusPowered ? "STARTING" : "OFF");
             // Before liftoff this is the launch-commit load check; in flight it only fails when the active stage is dry.
+            double minimum = spec.launchMinimumPropellantFraction;
             bool propellantGo = HasLiftedOff
                 ? craft.Fuel.HasPropellant(craft.Engine.ActiveStage)
-                : craft.Fuel.GetFraction(0) > 0.97 && craft.Fuel.GetFraction(1) > 0.97;
-            Set(3, propellantGo, HasLiftedOff ? "DEPLETED" : "LOW");
+                : craft.Fuel.GetFraction(0) > minimum && craft.Fuel.GetFraction(1) > minimum;
+            Set(3, propellantGo, HasLiftedOff ? "DEPLETED" : (craft.Engine.IsBurning ? "LOW" : "TOPPING"));
             Set(4, craft.Fuel.FeedReady, craft.Fuel.FeedPressure > 0.01 ? "PRESSURISING" : "OFF");
             Set(5, craft.Navigation.Aligned, craft.Navigation.Enabled ? "ALIGNING" : "OFF");
             // ASCENT is required to launch. Once flying, ORBIT (prograde hold) is as valid a mode as ASCENT.
             bool navModeGo = HasLiftedOff ? craft.Navigation.Mode != NavMode.Standby : craft.Navigation.Mode == NavMode.Ascent;
-            Set(6, navModeGo, craft.Navigation.Mode == NavMode.Standby ? "STBY" : "ORBIT");
+            Set(6, navModeGo, craft.Navigation.Mode == NavMode.Standby ? "STBY" : craft.Navigation.Mode.ToString().ToUpperInvariant());
             Set(7, craft.Navigation.GuidanceEnabled, "OFF");
             Set(8, craft.Comms.LinkEstablished, craft.Comms.Enabled && craft.Comms.AntennaEnabled ? "ACQUIRING" : "NO LINK");
             Set(9, craft.LifeSupport.Nominal, craft.LifeSupport.Enabled ? "PRESSURISING" : "OFF");
@@ -446,11 +525,22 @@ namespace Phainon.Simulation
             return null;
         }
 
+        public void RefreshGuide() { UpdateObjective(); }
+
         private void UpdateObjective()
         {
             string text;
             ControlId control = ControlId.None;
             SystemsSpec limits = craft.SystemsSpec;
+
+            // A story mission words its own guide, fault procedures included.
+            if (craft.Story != null && Phase != MissionPhase.Failed)
+            {
+                craft.Story.GetGuide(out text, out control);
+                CurrentObjective = text;
+                SuggestedControl = control;
+                return;
+            }
 
             switch (Phase)
             {
@@ -662,6 +752,7 @@ namespace Phainon.Simulation
             get
             {
                 FlightModel flight = craft.Flight;
+                if (craft.Story != null) return Phase == MissionPhase.Failed ? 0.0 : craft.Story.Progress;
                 switch (Phase)
                 {
                     case MissionPhase.PreLaunch:
@@ -689,10 +780,12 @@ namespace Phainon.Simulation
             if (PhaseChanged != null) PhaseChanged(phase);
         }
 
-        private void Fail(string reason)
+        /// <summary>Ends the mission as lost. The engine is shut down and stays shut down.</summary>
+        public void Fail(string reason)
         {
             if (Phase == MissionPhase.Failed) return;
             FailureReason = reason;
+            craft.Engine.Safe();
             SetPhase(MissionPhase.Failed);
             Notify("MISSION FAILED");
             if (Failed != null) Failed(reason);
@@ -701,6 +794,45 @@ namespace Phainon.Simulation
         private void Notify(string message)
         {
             if (Notification != null) Notification(message);
+        }
+
+        public MissionSnapshot Capture()
+        {
+            var s = new MissionSnapshot
+            {
+                phase = (int)Phase, launchState = (int)LaunchState, countdown = CountdownRemaining, met = MissionElapsedSeconds,
+                peakDynamicPressure = peakDynamicPressure, orbitGo = OrbitGo, hasEscaped = HasEscaped,
+                departureBurnCalled = departureBurnCalled, failureReason = FailureReason, nextDistanceMark = nextDistanceMark
+            };
+            s.eventStatus = new int[events.Count];
+            s.eventMet = new double[events.Count];
+            for (int i = 0; i < events.Count; i++)
+            {
+                s.eventStatus[i] = (int)events[i].Status;
+                s.eventMet[i] = events[i].MetSeconds;
+            }
+            return s;
+        }
+
+        public void Restore(MissionSnapshot s)
+        {
+            Phase = (MissionPhase)s.phase;
+            LaunchState = (LaunchSequenceState)s.launchState;
+            CountdownRemaining = s.countdown;
+            MissionElapsedSeconds = s.met;
+            peakDynamicPressure = s.peakDynamicPressure;
+            OrbitGo = s.orbitGo;
+            HasEscaped = s.hasEscaped;
+            departureBurnCalled = s.departureBurnCalled;
+            FailureReason = s.failureReason;
+            nextDistanceMark = s.nextDistanceMark;
+            for (int i = 0; i < events.Count && i < s.eventStatus.Length; i++)
+            {
+                events[i].Status = (MissionEventStatus)s.eventStatus[i];
+                events[i].MetSeconds = s.eventMet[i];
+            }
+            RefreshChecklist();
+            UpdateObjective();
         }
 
         /// <summary>Formats the mission clock as T-00:15 before liftoff and T+00:02:31 after.</summary>

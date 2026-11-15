@@ -1,0 +1,726 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2d6c2cf91479871b9ae86e7c6a324b3, type: 3}
+  m_Name: StoryCampaign
+  m_EditorClassIdentifier: Phainon.Runtime::Phainon.StoryCampaign
+  spec:
+    title: OPERATION PHAINON
+    subtitle: THE EXPEDITION INTO THE UNKNOWN
+    introduction:
+    - A young astronaut has been sent on an expedition across the stars.
+    - Operation Phainon.
+    - A solitary journey into the unknown, where one astronaut must survive an expedition through the endless darkness of deep space.
+    - 'Your objective is simple: obtain the required scientific discoveries, complete your mission and find your way home.'
+    - 'But why?
+
+
+      That is for you to discover.'
+    - As you explore the universe, your discoveries could revolutionise the world and transform humanity's understanding of the cosmos.
+    - 'Yet science is only part of the mission.
+
+
+      You are alone.'
+    - 'Your spacecraft is your home. Your supplies are limited. Your decisions matter.
+
+
+      Every system must be maintained, every journey carefully considered and every unexpected event survived.'
+    - 'You may uncover discoveries that change humanity forever.
+
+
+      But will you make it home?'
+    - SURVIVAL IS JUST AS IMPORTANT AS SCIENCE.
+    - WHICH WILL YOU CHOOSE?
+    chapters:
+    - id: chapter_1
+      title: CHAPTER ONE   THE GIANT
+      missionIds:
+      - m01_jupiter
+    missions:
+    - id: m01_jupiter
+      title: MISSION 01   JUPITER OBSERVATION
+      subtitle: OPERATION PHAINON
+      briefing: 'The mission computer has restarted. One instruction survives:
+
+
+        Obtain close-range observation data of Jupiter from a stable orbit. Transmit when able.
+
+
+        The rest of the flight plan, and most of the flight history, could not be read.'
+      scenario:
+        body:
+          name: JUPITER
+          mu: 1.26686534e+17
+          radiusMeters: 71492000
+          rotationPeriodSeconds: 35730
+          surfaceDensity: 0.16
+          scaleHeightMeters: 27000
+          destructionAltitudeMeters: 250000
+          featureLongitudeDegrees: -49
+        excessSpeed: 5600
+        periapsisAltitudeMeters: 20000000
+        startAltitudeMeters: 240000000
+        activeStage: 2
+        propellantFractions:
+        - 0
+        - 0
+        - 0.72
+        pitchDegrees: -73
+        yawDegrees: 0
+        rollDegrees: 0
+        batteryA: 1
+        batteryB: 1
+        mainBus: 1
+        apu: 1
+        fuelPump: 0
+        tankPress: 0
+        commAntenna: 1
+        comms: 1
+        navSystem: 0
+        navMode: 0
+        guidance: 1
+        rcs: 0
+        cabinSystems: 0
+        cabinLights: 1
+        externalCamera: 1
+        throttle: 0
+        batteryACharge: 0.38
+        batteryBCharge: 0.81
+        oxygenFraction: 0.74
+        cabinPressureKpa: 86
+        cabinTemperatureC: 11
+        initialFaults: 000000000300000004000000i
+        sunAngleDegrees: -38
+        sunElevationDegrees: 6
+        earthDistanceMeters: 778000000000
+        missionElapsedSeconds: 0
+      systems:
+        nominalBusVoltage: 28
+        batteryCapacityWattHours: 900
+        baseLoadWatts: 900
+        avionicsLoadWatts: 650
+        commsLoadWatts: 300
+        cabinLoadWatts: 550
+        fuelPumpLoadWatts: 1400
+        apuOutputWatts: 5200
+        apuStartSeconds: 2.5
+        batteryRechargeWatts: 400
+        tankPressurizeSeconds: 4
+        tankVentSeconds: 6
+        feedReadyThreshold: 0.95
+        feedHoldUpSeconds: 1.5
+        faultEarliestSeconds: 25
+        faultLatestSeconds: 300
+        faultMinAltitudeMeters: 0
+        pumpFaultDecaySeconds: 300
+        batteryFaultLoadWatts: 9000
+        weakEngineThrustFactor: 0.88
+        navAlignSeconds: 6
+        commsAcquireSeconds: 3.5
+        oxygenStartFraction: 0.98
+        oxygenUsePerSecond: 0.000000039
+        regulatorLeakPerSecond: 0.00012
+        cabinAirEnduranceSeconds: 14400
+        lowCabinAirFraction: 0.25
+        hypoxiaPressureKpa: 55
+        lowCabinTempC: 8
+        survivableMinTempC: -8
+        survivableMaxTempC: 46
+        crewIncapacitationSeconds: 240
+        nominalCabinPressureKpa: 101.3
+        unpoweredCabinPressureKpa: 30
+        cabinPressureTimeConstant: 5
+        cabinLeakTimeConstant: 30000
+        initialCabinPressureKpa: 99
+        cabinTempMinC: 17
+        cabinTempMaxC: 27
+        cabinTempDefaultC: 21
+        unconditionedCabinTempC: -35
+        cabinTempTimeConstant: 10
+        cabinWarmTimeConstant: 20000
+        initialCabinTempC: 26.5
+        lowBatteryFraction: 0.25
+        lowFuelFraction: 0.1
+        maxDynamicPressurePa: 21000
+        maxGLoad: 4
+        lowCabinPressureKpa: 97
+        lowOxygenFraction: 0.2
+        highCabinTempC: 28.5
+        lowBusVoltage: 24
+        trajectoryLowAltitudeMeters: 120000
+      mission:
+        missionName: OPERATION PHAINON
+        missionSubtitle: MISSION 01   JUPITER
+        countdownSeconds: 15
+        ignitionWindowSeconds: 6
+        liftoffThrustToWeight: 1.03
+        launchMinimumPropellantFraction: 0.97
+        padToppingFractionPerSecond: 0.004
+        stageSeparationMinAltitudeMeters: 40000
+        orbitMinPeriapsisMeters: 150000
+        reentryFailAltitudeMeters: 60000
+        spaceBoundaryAltitudeMeters: 100000
+        maxQDetectMinPa: 8000
+        distanceMarksKm: []
+        phases:
+        - phase: 4
+          title: JUPITER
+          objective: Obtain close-range observation data of Jupiter from a stable orbit.
+        - phase: 5
+          title: MISSION LOST
+          objective: The expedition cannot continue.
+      comms:
+        replyWindowSeconds: 900
+        staleAfterSeconds: 21600
+        groundReactsAfterLightTime: 1
+        timeAccelerationWhileAwaiting: 1
+        characters:
+        - id: flight
+          name: Mara Okafor
+          role: FLIGHT DIRECTOR
+        - id: capcom
+          name: Dev Anand
+          role: CAPCOM
+        - id: navigation
+          name: Ilse Brandt
+          role: NAVIGATION
+        - id: propulsion
+          name: Tomas Reyes
+          role: PROPULSION
+        - id: science
+          name: Dr. Amara Nwosu
+          role: SCIENCE
+        - id: specialist
+          name: Jonah Vale
+          role: MISSION SPECIALIST
+        - id: net
+          name: Deep Space Net
+          role: AUTOMATED
+        lines:
+        - id: beacon
+          speaker: net
+          trigger: 1
+          warning: 0
+          fault: 0
+          delaySeconds: 20
+          requiresFlag: 
+          forbidsFlag: 
+          text: 'MERIDIAN DEEP SPACE NET. CARRIER SEARCH ACTIVE. ANY STATION RECEIVING THIS TRANSMISSION: KEY YOUR TRANSMITTER AND HOLD. ONE-WAY LIGHT TIME {delaymin} MINUTES.'
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 1
+        - id: first_contact
+          speaker: capcom
+          trigger: 1
+          warning: 0
+          fault: 0
+          delaySeconds: 30
+          requiresFlag: 
+          forbidsFlag: 
+          text: Phainon, Meridian. We have your carrier. We lost you for a long time. Tell us how you are, and remember anything you say takes {delaymin} minutes to get here.
+          replies:
+          - label: Report status
+            line: Meridian, Phainon. Awake. The ship restarted on its own and I am putting it back together. Jupiter is ahead.
+            setsFlag: crew_reported
+            followUp: contact_reported
+          - label: Ask what happened
+            line: Meridian, Phainon. I woke up to alarms with most of my flight log gone. What happened to me?
+            setsFlag: asked_what_happened
+            followUp: contact_asked
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: contact_reported
+          speaker: flight
+          trigger: 0
+          warning: 0
+          fault: 0
+          delaySeconds: 20
+          requiresFlag: 
+          forbidsFlag: 
+          text: 'Phainon, Flight. It is good to hear your voice. The plan has not changed: Jupiter first. We will talk about the rest once you are in orbit.'
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: contact_asked
+          speaker: flight
+          trigger: 0
+          warning: 0
+          fault: 0
+          delaySeconds: 20
+          requiresFlag: 
+          forbidsFlag: 
+          text: Phainon, Flight. We see the same gap you do. Your telemetry stopped and then came back by itself. We did not command the restart. Say again, we did not -
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 1
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: contact_silent
+          speaker: capcom
+          trigger: 18
+          warning: 0
+          fault: 0
+          delaySeconds: 5
+          requiresFlag: first_contact_no_reply
+          forbidsFlag: 
+          text: Phainon, Meridian. Nothing heard. We will keep listening for as long as it takes.
+          replies: []
+          storyEvent: 
+          logged: 0
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: capture
+          speaker: navigation
+          trigger: 25
+          warning: 0
+          fault: 0
+          delaySeconds: 15
+          requiresFlag: '@bound'
+          forbidsFlag: 
+          text: Phainon, Navigation. We show you captured, {peri} by {apo} kilometres. That is an orbit. Well flown.
+          replies: []
+          storyEvent: objective:capture
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: regulator_cleared
+          speaker: propulsion
+          trigger: 20
+          warning: 0
+          fault: 6
+          delaySeconds: 10
+          requiresFlag: 
+          forbidsFlag: 
+          text: Phainon, Reyes. We watched your oxygen regulator stick and we watched you fix it before our warning could reach you. You are {delaymin} minutes ahead of anything we can tell you. Keep that in mind.
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: science_bands
+          speaker: science
+          trigger: 25
+          warning: 0
+          fault: 0
+          delaySeconds: 20
+          requiresFlag: 
+          forbidsFlag: 
+          text: Phainon, Science. Your band imagery is down. Nobody in this room has seen the jets from that close. Thank you.
+          replies: []
+          storyEvent: sent:bands
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: science_spectrum
+          speaker: science
+          trigger: 25
+          warning: 0
+          fault: 0
+          delaySeconds: 20
+          requiresFlag: anomaly_spectrum
+          forbidsFlag: 
+          text: Phainon, Science. About your spectrum. There is a line in it that should not be there. Run the instrument again when you can, and hold the result in storage. Do not send that one twice.
+          replies: []
+          storyEvent: sent:spectrum
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: complete
+          speaker: flight
+          trigger: 25
+          warning: 0
+          fault: 0
+          delaySeconds: 30
+          requiresFlag: 
+          forbidsFlag: 
+          text: Phainon, Flight. We have your data. I am cleared to release the next instruction. It is in your log now. I am sorry it is not the one you were hoping for.
+          replies: []
+          storyEvent: mission_complete
+          logged: 1
+          garbled: 0
+          requestLabel: 
+          requestLine: 
+          setsFlag: instruction_2_released
+          alreadyOnItsWay: 0
+        - id: ask_guidance
+          speaker: navigation
+          trigger: 26
+          warning: 0
+          fault: 0
+          delaySeconds: 15
+          requiresFlag: 
+          forbidsFlag: '@orbit_stable'
+          text: 'Phainon, Navigation. For the capture: NAV MODE to RETRO, GUIDANCE and RCS on, full throttle, and light the engine half a burn before periapsis. You have {dv} metres per second. Cut off when ORBIT GO lights and keep the rest.'
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: Ask for capture guidance
+          requestLine: Meridian, Phainon. Request guidance for getting into orbit.
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: ask_records
+          speaker: specialist
+          trigger: 26
+          warning: 0
+          fault: 0
+          delaySeconds: 15
+          requiresFlag: read:record_instruction
+          forbidsFlag: 
+          text: Phainon, Vale. Instructions two to nine are sealed until the Jupiter data is on the ground. That was the arrangement you signed. It was written that way for a reason, and I am not allowed to give the reason on this channel.
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: Ask about the missing records
+          requestLine: Meridian, Phainon. My flight plan shows one instruction out of nine and my log has holes in it. What am I missing?
+          setsFlag: 
+          alreadyOnItsWay: 0
+        - id: ask_objective
+          speaker: flight
+          trigger: 26
+          warning: 0
+          fault: 0
+          delaySeconds: 15
+          requiresFlag: 
+          forbidsFlag: 
+          text: 'Phainon, Flight. One objective for now: close-range data from a stable orbit, sent home. The bands, the Red Spot, a spectrum, the radiation environment, as many as you can get. Everything after that waits on it.'
+          replies: []
+          storyEvent: 
+          logged: 1
+          garbled: 0
+          requestLabel: Ask to confirm the objective
+          requestLine: Meridian, Phainon. Confirm my objective at Jupiter.
+          setsFlag: 
+          alreadyOnItsWay: 0
+      objectives:
+      - id: alarm
+        title: Silence the alarm
+        stage: WAKING
+        text: Alarms. Press MASTER ALARM to silence it, then find out what is wrong.
+        control: 19
+        condition: 0
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 0
+        setsFlag: 
+      - id: power
+        title: Restore auxiliary power
+        stage: WAKING
+        text: The spacecraft is on batteries. Restore the APU.
+        control: 32
+        condition: 1
+        parameter: 
+        value: 0
+        repairFault: 0
+        yieldsToFaults: 0
+        setsFlag: 
+      - id: cabin
+        title: Restart the cabin loop
+        stage: WAKING
+        text: The cabin is cold and losing pressure. Press CABIN SYS to restart the environment loop.
+        control: 13
+        condition: 2
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 0
+        setsFlag: 
+      - id: nav
+        title: Realign the nav platform
+        stage: WAKING
+        text: The flight computer does not know which way it is pointing. Press NAV SYSTEM to realign the platform.
+        control: 11
+        condition: 3
+        parameter: 
+        value: 0
+        repairFault: 3
+        yieldsToFaults: 0
+        setsFlag: 
+      - id: radio
+        title: Recover the radio link
+        stage: WAKING
+        text: There is nothing on the radio. Recover the link.
+        control: 35
+        condition: 4
+        parameter: 
+        value: 0
+        repairFault: 4
+        yieldsToFaults: 0
+        setsFlag: 
+      - id: record
+        title: Read the mission record
+        stage: TAKING STOCK
+        text: The mission computer has recovered part of the flight plan. Press J to open the log and read it.
+        control: 0
+        condition: 5
+        parameter: record_instruction
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: approach
+        title: Assess the approach
+        stage: JUPITER APPROACH
+        text: 'Jupiter is {tpe} away at closest approach, and this path does not stop there. Turn NAV MODE to RETRO: the left display shows the approach and what it takes to stay.'
+        control: 52
+        condition: 6
+        parameter: 
+        value: 3
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: propulsion
+        title: Pressurise the engine feed
+        stage: JUPITER APPROACH
+        text: Set FUEL PUMP and TANK PRESS ON and wait for feed pressure.
+        control: 33
+        condition: 7
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: attitude
+        title: Turn against the flight path
+        stage: JUPITER APPROACH
+        text: Set GUIDANCE and RCS ON. The computer will turn the engine to face the way you are going.
+        control: 36
+        condition: 8
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: capture
+        title: Capture into orbit
+        stage: JUPITER APPROACH
+        text: 'Coast to periapsis: {tpe} to go. Press . to speed time up. Light the engine when TIME TO PE reads {lead}; the burn is {burn} for {capture} m/s of the {dv} you have.'
+        control: 0
+        condition: 9
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: captured
+      - id: science_power
+        title: Power the science payload
+        stage: JUPITER ORBIT
+        text: In orbit. Set SCIENCE PWR ON to bring the instruments up.
+        control: 40
+        condition: 10
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: observe
+        title: Collect three observations
+        stage: JUPITER ORBIT
+        text: 'Collect {need} observations ({count} so far). Choose with INSTRUMENT, aim the window at Jupiter (GUIDANCE off, RCS on, W and S), then press OBSERVE. Payload: {science}.'
+        control: 21
+        condition: 11
+        parameter: 
+        value: 3
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      - id: transmit
+        title: Send the data home
+        stage: JUPITER ORBIT
+        text: Press TRANSMIT to send the observations to Earth. The radio link has to hold until the last one has gone.
+        control: 22
+        condition: 12
+        parameter: 
+        value: 0
+        repairFault: -1
+        yieldsToFaults: 1
+        setsFlag: 
+      instruments:
+      - id: camera
+        name: IMAGING CAMERA
+        label: CAM
+        powerWatts: 160
+        needsPointing: 1
+        pointingToleranceDegrees: 6
+        needsSunlight: 1
+        condition: 1
+      - id: spectrometer
+        name: SPECTROMETER
+        label: SPEC
+        powerWatts: 220
+        needsPointing: 1
+        pointingToleranceDegrees: 6
+        needsSunlight: 1
+        condition: 0.8
+      - id: radiation
+        name: RADIATION SENSOR
+        label: RAD
+        powerWatts: 60
+        needsPointing: 0
+        pointingToleranceDegrees: 6
+        needsSunlight: 0
+        condition: 0.95
+      observations:
+      - id: bands
+        title: Atmospheric band structure
+        instrumentId: camera
+        durationSeconds: 45
+        maxAltitudeMeters: 900000000
+        bestAltitudeMeters: 250000000
+        needsFeature: 0
+        featureWindowDegrees: 55
+        finding: An imaging sequence of the zones and belts from close range. Eastward and westward jets alternate with latitude, and the shear between them is drawn out in long streaks of cloud.
+        poorFinding: The frames are soft. The belts are there, but little can be measured from them.
+        setsFlag: 
+        anomaly: 0
+        transmitSeconds: 30
+      - id: redspot
+        title: Great Red Spot
+        instrumentId: camera
+        durationSeconds: 50
+        maxAltitudeMeters: 600000000
+        bestAltitudeMeters: 200000000
+        needsFeature: 1
+        featureWindowDegrees: 55
+        finding: The storm fills the frame. Cloud at its rim turns counter-clockwise, and the turbulent wake to its west is laid out in detail.
+        poorFinding: The storm is in frame but smeared. Its rim cannot be traced.
+        setsFlag: 
+        anomaly: 0
+        transmitSeconds: 30
+      - id: spectrum
+        title: Upper atmosphere spectrum
+        instrumentId: spectrometer
+        durationSeconds: 60
+        maxAltitudeMeters: 450000000
+        bestAltitudeMeters: 150000000
+        needsFeature: 0
+        featureWindowDegrees: 55
+        finding: Hydrogen, helium, methane and ammonia, where the models put them. One narrow absorption line near 1.74 micrometres matches nothing in the instrument's catalogue. The self-test passes. The line is in every frame.
+        poorFinding: The spectrum is noisy. The main gases can be picked out and nothing else can be said.
+        setsFlag: anomaly_spectrum
+        anomaly: 1
+        transmitSeconds: 20
+      - id: radiation
+        title: Radiation environment
+        instrumentId: radiation
+        durationSeconds: 60
+        maxAltitudeMeters: 500000000
+        bestAltitudeMeters: 120000000
+        needsFeature: 0
+        featureWindowDegrees: 55
+        finding: Charged-particle flux rises steeply inward, as it should this deep in the magnetosphere. The dose rate inside the hull is within the limit for the planned stay.
+        poorFinding: The counts are too few to draw the profile. The flux rises inward; how steeply is not clear.
+        setsFlag: 
+        anomaly: 0
+        transmitSeconds: 15
+      journal:
+      - id: record_instruction
+        category: 5
+        reliability: 0
+        title: 'Flight plan: restored from backup'
+        body: 'OPERATION PHAINON
+
+          FLIGHT PLAN, RESTORED FROM THE BACKUP STORE
+
+
+          Instruction 1, current:
+
+          Obtain close-range observation data of Jupiter from a stable orbit. Transmit when able.
+
+
+          Instructions 2 to 9: NOT RECOVERED.
+
+
+          Flight history before the restart: 2 entries readable. The number of entries lost is not known.'
+        unlockFlag: 
+      - id: record_log_fragment
+        category: 5
+        reliability: 2
+        title: 'Flight log: fragment'
+        body: '...cruise nominal. I asked again what the second half of the plan is. They said it would be uplinked when [unreadable].
+
+
+          ...power transient on bus A. Probably nothing. Going to sleep.
+
+
+          [The entries end here. The date fields did not survive.]'
+        unlockFlag: 
+      - id: recording_01
+        category: 2
+        reliability: 1
+        title: 'Voice memo: no date stamp'
+        body: 'A recording in the personal store. The voice is your own.
+
+
+          "If you are hearing this, the restart worked, and you do not remember making this. They said that might happen.
+
+
+          Do the Jupiter work first. I cannot tell you the rest, because I do not know it either. I only know that I agreed to it."
+
+
+          There is no date on the file and nothing to say when, or whether, it was recorded on this flight.'
+        unlockFlag: done:cabin
+      - id: record_instruction_2
+        category: 5
+        reliability: 0
+        title: 'Flight plan: instruction 2'
+        body: 'INSTRUCTION 2, RELEASED BY UPLINK
+
+
+          Do not begin the return. Hold at Jupiter. A second target will be given.
+
+
+          Instructions 3 to 9: SEALED.'
+        unlockFlag: instruction_2_released
+      faults:
+      - fault: 6
+        afterObjectiveId: capture
+        delaySeconds: 420
+      orbitMinPeriapsisMeters: 5000000
+      orbitMaxApoapsisMeters: 3000000000
+      escapeFailRadiusMeters: 700000000
+      burnWindowWarningSeconds: 300
+      completionText: 'The Jupiter data is on its way home. The flight plan still shows one instruction of nine. The spacecraft is yours: stay in orbit, keep observing, or save and rest from the pause menu.'

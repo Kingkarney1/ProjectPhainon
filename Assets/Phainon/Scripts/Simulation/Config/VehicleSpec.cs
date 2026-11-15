@@ -72,6 +72,12 @@ namespace Phainon.Simulation
         /// <summary>Lowest setting of the thrust-limit dial, as a fraction of full thrust.</summary>
         public double minThrustLimit = 0.4;
 
+        /// <summary>
+        /// How far the forward window, and the instruments sighted along it, look below the thrust
+        /// axis, in degrees. The scene's cabin is built with the same tilt.
+        /// </summary>
+        public double windowTiltDegrees = 30.0;
+
         public static StageSpec[] DefaultStages()
         {
             return new[]

@@ -2,7 +2,15 @@ using System;
 
 namespace Phainon.Simulation
 {
-    public enum NavMode { Standby = 0, Ascent = 1, Orbit = 2 }
+    public enum NavMode { Standby = 0, Ascent = 1, Orbit = 2, Retro = 3 }
+
+    [Serializable]
+    public class NavigationSnapshot
+    {
+        public bool enabled, guidanceEnabled;
+        public int mode;
+        public double alignment;
+    }
 
     /// <summary>Inertial platform alignment, the navigation mode selector and the guidance enable switch.</summary>
     public class NavigationSystem
@@ -42,6 +50,19 @@ namespace Phainon.Simulation
         {
             Enabled = false;
             AlignmentProgress = 0.0;
+        }
+
+        public NavigationSnapshot Capture()
+        {
+            return new NavigationSnapshot { enabled = Enabled, guidanceEnabled = GuidanceEnabled, mode = (int)Mode, alignment = AlignmentProgress };
+        }
+
+        public void Restore(NavigationSnapshot s)
+        {
+            Enabled = s.enabled;
+            GuidanceEnabled = s.guidanceEnabled;
+            Mode = (NavMode)s.mode;
+            AlignmentProgress = s.alignment;
         }
 
         public void Tick(double dt, bool busPowered)

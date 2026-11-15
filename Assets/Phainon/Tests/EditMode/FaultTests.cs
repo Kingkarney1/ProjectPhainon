@@ -41,6 +41,7 @@ namespace Phainon.Tests
                     case ControlId.CommAntenna: pilot.Set(ControlId.CommAntenna, craft.Comms.AntennaEnabled ? 0 : 1); break;
                     case ControlId.NavSystem: pilot.Press(ControlId.NavSystem); break;
                     case ControlId.Comms: pilot.Press(ControlId.Comms); break;
+                    case ControlId.CabinSystems: pilot.Press(ControlId.CabinSystems); break;
                     case ControlId.EngineIgnition:
                         // Relight after a flameout. Staging ignition is the base pilot's job.
                         if (craft.Mission.Phase != MissionPhase.Ascent && craft.Mission.Phase != MissionPhase.OrbitalInsertion) return;
@@ -65,7 +66,7 @@ namespace Phainon.Tests
                 Assert.That(a.ScheduledMetSeconds, Is.InRange(25.0, 300.0));
                 seen.Add(a.Scheduled);
             }
-            Assert.AreEqual(FaultSystem.Count, seen.Count, "every fault should be reachable from some seed");
+            Assert.AreEqual(FaultSystem.RandomPoolCount, seen.Count, "every fault a launch can draw should be reachable from some seed");
 
             double[] raisedAt = new double[2];
             for (int run = 0; run < 2; run++)

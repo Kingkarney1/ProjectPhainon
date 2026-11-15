@@ -25,7 +25,10 @@ namespace Phainon.Audio
         private AudioSource[] voices;
         private int nextVoice;
 
-        private AudioSource ambient, hum, apu, engine, rumble, wind, rcs, alarm;
+        private AudioSource ambient, hum, apu, engine, rumble, wind, rcs, alarm, breathing, radioStatic;
+
+        /// <summary>How awake the astronaut is, 0..1. Everything is quiet and close while they come round.</summary>
+        public float Consciousness { get; set; } = 1f;
 
         private void Awake()
         {
@@ -41,6 +44,8 @@ namespace Phainon.Audio
             wind = CreateLoop("Wind", library.windLoop);
             rcs = CreateLoop("RCS", library.rcsLoop);
             alarm = CreateLoop("Master Alarm", library.masterAlarm);
+            breathing = CreateLoop("Breathing", library.breathingLoop);
+            radioStatic = CreateLoop("Radio Static", library.radioStaticLoop);
         }
 
         private void Start()
@@ -85,7 +90,8 @@ namespace Phainon.Audio
         private void Update()
         {
             Spacecraft craft = spacecraft.Craft;
-            bool audible = game.State != GameState.MainMenu && game.State != GameState.Briefing;
+            bool audible = game.State != GameState.MainMenu && game.State != GameState.Briefing && game.State != GameState.Intro;
+            AudioListener.volume = GameSettings.MasterVolume * Mathf.Lerp(0.25f, 1f, Consciousness);
             bool powered = craft.Power.IsBusPowered;
             float k = 1f - Mathf.Exp(-loopFadeSpeed * Time.unscaledDeltaTime);
 
@@ -106,6 +112,11 @@ namespace Phainon.Audio
             Drive(rumble, library.rumbleLoop, audible ? Mathf.Clamp01(vibration * 1.3f) : 0f, Mathf.Lerp(0.85f, 1.1f, vibration), k);
             Drive(wind, library.windLoop, audible ? buffet : 0f, Mathf.Lerp(0.8f, 1.3f, buffet), k);
             Drive(rcs, library.rcsLoop, audible && craft.Attitude.RcsFiring ? 1f : 0f, 1f, k * 3f);
+
+            Drive(breathing, library.breathingLoop, audible ? 1f - Consciousness : 0f, 1f, k);
+            // An open receiver with nobody on the other end hisses.
+            bool hiss = audible && powered && craft.Scenario != null && craft.Comms.Enabled && !craft.Comms.LinkEstablished;
+            Drive(radioStatic, library.radioStaticLoop, hiss ? 1f : 0f, 1f, k);
 
             // The alarm sounds only while a red warning is unacknowledged and there is power to drive it.
             bool alarming = audible && powered && craft.Warnings.MasterAlarmActive && game.State != GameState.Paused;
@@ -129,7 +140,7 @@ namespace Phainon.Audio
         public void Play(SoundEntry entry)
         {
             if (entry == null || entry.clip == null) return;
-            if (game.State == GameState.MainMenu || game.State == GameState.Briefing) return;
+            if (game.State == GameState.MainMenu || game.State == GameState.Briefing || game.State == GameState.Intro) return;
 
             AudioSource voice = voices[nextVoice];
             nextVoice = (nextVoice + 1) % voices.Length;

@@ -10,6 +10,8 @@ Shader "Phainon/SpaceSky"
     {
         _EarthDayTex ("Earth Day Map (equirectangular)", 2D) = "black" {}
         [Toggle] _HasEarthTex ("Use Day Map", Float) = 0
+        _JupiterTex ("Jupiter Map (equirectangular)", 2D) = "black" {}
+        [Toggle] _HasJupiterTex ("Use Jupiter Map", Float) = 0
         _CloudCoverage ("Cloud Coverage", Range(0, 1)) = 0.52
         _StarBrightness ("Star Brightness", Range(0, 4)) = 1.4
         _SunIntensity ("Sun Disc Intensity", Range(0, 80)) = 30
@@ -42,10 +44,14 @@ Shader "Phainon/SpaceSky"
 
             TEXTURE2D(_EarthDayTex);
             SAMPLER(sampler_EarthDayTex);
+            TEXTURE2D(_JupiterTex);
+            SAMPLER(sampler_JupiterTex);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _EarthDayTex_ST;
                 float _HasEarthTex;
+                float4 _JupiterTex_ST;
+                float _HasJupiterTex;
                 float _CloudCoverage;
                 float _StarBrightness;
                 float _SunIntensity;
@@ -65,8 +71,12 @@ Shader "Phainon/SpaceSky"
             float _PhainonCloudTime;
             float4x4 _PhainonWorldToEarth;      // rotation from world space to Earth-fixed axes
             float4x4 _PhainonWorldToInertial;   // rotation from world space to the star field
+            float _PhainonBodyRadiusKm;     // radius of the body below; unset means Earth
+            float _PhainonBody;             // 0 Earth, 1 Jupiter
+            float _PhainonFeatureLon;       // longitude of the Great Red Spot, radians, for the drawn fallback
 
-            static const float EARTH_RADIUS_KM = 6371.0;
+            // The body's radius. Everything that used to assume Earth reads this instead.
+            #define EARTH_RADIUS_KM (_PhainonBodyRadiusKm > 1.0 ? _PhainonBodyRadiusKm : 6371.0)
             static const float PI_F = 3.14159265;
 
             struct Attributes
@@ -265,6 +275,58 @@ Shader "Phainon/SpaceSky"
                 return lerp(shaded, hazeColor, haze * 0.88);
             }
 
+            // Fallback gas giant used when no map is assigned: belts, zones and one red storm.
+            float3 ProceduralJupiter(float3 n)
+            {
+                float latitude = asin(clamp(n.y, -1.0, 1.0));
+                float warp = (Fbm3(n * float3(3.0, 14.0, 3.0) + 2.0) - 0.5) * 0.10;
+                float band = smoothstep(0.25, 0.75, sin((latitude + warp) * 18.0) * 0.5 + 0.5);
+                float3 color = lerp(float3(0.56, 0.36, 0.22), float3(0.85, 0.78, 0.66), band);
+                color *= 0.85 + 0.30 * Fbm3(n * float3(6.0, 40.0, 6.0));
+                color = lerp(color, float3(0.45, 0.42, 0.42), smoothstep(0.75, 1.0, abs(n.y)));
+                float3 centre = float3(cos(-0.33) * cos(_PhainonFeatureLon), sin(-0.33), cos(-0.33) * sin(_PhainonFeatureLon));
+                float3 east = normalize(cross(float3(0.0, 1.0, 0.0), centre));
+                float3 offset = n - centre;
+                // Squared by hand: pow of a negative number is undefined on some graphics APIs.
+                float2 scaled = float2(dot(offset, east) / 0.16, offset.y / 0.09);
+                float ellipse = dot(scaled, scaled);
+                return lerp(color, float3(0.72, 0.30, 0.18), smoothstep(1.0, 0.6, ellipse) * step(0.0, dot(n, centre)));
+            }
+
+            // Jupiter: the same ray-sphere geometry as the Earth, a cloud-top map and no surface below it.
+            float3 ShadeJupiter(float3 viewDir, float3 up, float3 sun, float camRadius, float altitudeKm, float cosNadir, float sinNadir)
+            {
+                float b = -camRadius * cosNadir;
+                float c = altitudeKm * (2.0 * EARTH_RADIUS_KM + altitudeKm);
+                float miss = camRadius * sinNadir;
+                float disc = max(EARTH_RADIUS_KM * EARTH_RADIUS_KM - miss * miss, 0.0);
+                float t = c / (-b + sqrt(disc));
+
+                float3 n = normalize(up * camRadius + viewDir * t);
+                float3 nBody = normalize(mul(RotationOrIdentity(_PhainonWorldToEarth), n));
+                float viewCos = saturate(dot(n, -viewDir));
+
+                float3 albedo;
+                if (_HasJupiterTex < 0.5)
+                {
+                    albedo = ProceduralJupiter(nBody);
+                }
+                else
+                {
+                    float u = atan2(nBody.z, nBody.x) / (2.0 * PI_F) + 0.5;
+                    float v = asin(clamp(nBody.y, -1.0, 1.0)) / PI_F + 0.5;
+                    // One texel of a 2048-wide map covers about 219 km at Jupiter's equator.
+                    float footprintKm = t * 0.0011 / max(viewCos, 0.03);
+                    albedo = SAMPLE_TEXTURE2D_LOD(_JupiterTex, sampler_JupiterTex, float2(u, v), log2(max(footprintKm / 219.0, 1.0))).rgb;
+                }
+
+                // Thick cloud scatters light softly: a gentle terminator and a darkened limb.
+                float ndl = dot(n, sun);
+                float lit = smoothstep(-0.06, 0.30, ndl) * (0.25 + 0.75 * saturate(ndl));
+                float limb = pow(viewCos, 0.35);
+                return albedo * (lit * limb * 1.2 + 0.003);
+            }
+
             float3 ShadeSky(float3 viewDir, float3 up, float3 sun, float camRadius, float above, float altitudeKm)
             {
                 float atmosphere = _PhainonAtmosphere;
@@ -284,6 +346,8 @@ Shader "Phainon/SpaceSky"
                 float3 limb = lerp(_LimbColor.rgb, float3(0.80, 0.90, 1.0), core) * band * limbLit * lerp(1.5, 0.55, atmosphere);
                 // Near the terminator the limb turns from blue to the orange of a sunrise seen from orbit.
                 limb *= lerp(float3(1.0, 0.42, 0.16), float3(1.0, 1.0, 1.0), smoothstep(-0.08, 0.15, dot(limbNormal, sun)));
+                // The blue line is Earth's air. Jupiter's edge is just cloud.
+                limb *= 1.0 - saturate(_PhainonBody);
 
                 float3 color = sky + limb;
 
@@ -301,7 +365,7 @@ Shader "Phainon/SpaceSky"
                 const float moonRadius = 0.0135;      // radians; a little larger than life so it reads on screen
                 float moonCos = dot(viewDir, moonDir);
                 float moonEdge = cos(moonRadius);
-                if (moonCos > moonEdge)
+                if (moonCos > moonEdge && _PhainonBody < 0.5)
                 {
                     float3 offset = (viewDir - moonDir * moonCos) / sin(moonRadius);
                     float r2 = saturate(dot(offset, offset));
@@ -343,7 +407,8 @@ Shader "Phainon/SpaceSky"
                 float3 color;
                 if (above < 0.0)
                 {
-                    color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir, sinNadir);
+                    if (_PhainonBody > 0.5) color = ShadeJupiter(viewDir, up, sun, camRadius, altitudeKm, cosNadir, sinNadir);
+                    else color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir, sinNadir);
 
                     // Blend the last sliver of surface into the atmosphere so the limb has no hard edge.
                     float3 skyAtLimb = ShadeSky(viewDir, up, sun, camRadius, 0.0, altitudeKm);

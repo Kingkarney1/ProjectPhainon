@@ -16,6 +16,7 @@ MonoBehaviour:
   launchLongitude: -80.6
   launchAzimuth: 90
   stackHeight: 62
+  cabinTiltDegrees: 30
   siteFadeStartAltitude: 1500
   siteFadeEndAltitude: 5500
   sunAzimuth: 115
@@ -32,8 +33,16 @@ MonoBehaviour:
   groundAmbient: {r: 0.36, g: 0.42, b: 0.5, a: 1}
   spaceAmbient: {r: 0.015, g: 0.018, b: 0.025, a: 1}
   earthshine: {r: 0.035, g: 0.055, b: 0.085, a: 1}
+  deepSpaceSunScale: 0.55
+  jupiterShine: {r: 0.085, g: 0.07, b: 0.05, a: 1}
   cloudLayers:
   - {x: 2200, y: 900}
   - {x: 6500, y: 1600}
   - {x: 10500, y: 700}
   cloudDriftSpeed: 1
+  effectsDensity: 1
+  humidityScaleHeight: 6500
+  vapourPeakMach: 1
+  vapourMachWidth: 0.22
+  chaseCameraOffset: {x: 260, y: -25, z: -150}
+  chaseCameraFov: 34

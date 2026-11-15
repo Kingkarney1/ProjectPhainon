@@ -13,6 +13,7 @@ namespace Phainon.EditorTools
         public const string Scenes = Root + "/Scenes";
         public const string MissionScene = Scenes + "/Mission.unity";
         public const string EarthDayTexture = Textures + "/EarthDay.jpg";
+        public const string JupiterTexture = Textures + "/JupiterMap.jpg";
         public const string VolumeProfile = "Assets/Settings/CockpitPostProcess.asset";
 
         public const int LayerCockpit = 6;

@@ -384,6 +384,7 @@ namespace Phainon.EditorTools
 
             // Stage status under the feed.
             RectTransform stages = ui.Section(frame.content, 10f, 441f, 600f, 175f, "STAGE STATUS");
+            display.stagesTitle = stages.GetComponentInChildren<TMP_Text>();
             display.boosterStatus = ui.Status(stages, 14f, 40f, 572f, 38f, "CORE BOOSTER", 18f);
             display.upperStageStatus = ui.Status(stages, 14f, 82f, 572f, 38f, "UPPER STAGE", 18f);
             display.separationStatus = ui.Status(stages, 14f, 124f, 572f, 38f, "STAGE SEPARATION", 18f);
@@ -398,6 +399,7 @@ namespace Phainon.EditorTools
 
             // Flight event timeline.
             RectTransform events = ui.Section(frame.content, 620f, 316f, 370f, 300f, "FLIGHT EVENTS");
+            display.eventsTitle = events.GetComponentInChildren<TMP_Text>();
             display.eventRows = new StatusRow[7];
             for (int i = 0; i < display.eventRows.Length; i++)
                 display.eventRows[i] = ui.Status(events, 14f, 38f + i * 36f, 342f, 32f, "--", 15.5f);

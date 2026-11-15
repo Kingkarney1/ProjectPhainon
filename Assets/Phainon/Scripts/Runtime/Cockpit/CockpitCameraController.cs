@@ -40,6 +40,12 @@ namespace Phainon.Cockpit
         public float Vibration { get { return smoothedVibration; } }
         public bool IsLooking { get; private set; }
 
+        /// <summary>While true the head is moved by a sequence, not by the player, to the angles below.</summary>
+        public bool Directed { get; set; }
+        public float DirectedYaw { get; set; }
+        public float DirectedPitch { get; set; }
+        public float DirectedRoll { get; set; }
+
         private void Awake()
         {
             restPosition = transform.localPosition;
@@ -98,6 +104,13 @@ namespace Phainon.Cockpit
                 viewCamera.fieldOfView = Mathf.Lerp(viewCamera.fieldOfView, fov, 1f - Mathf.Exp(-settings.zoomSpeed * Time.unscaledDeltaTime));
             }
 
+            if (Directed)
+            {
+                // The sequence leaves the head where it put it, so control passes over without a jump.
+                yaw = targetYaw = DirectedYaw;
+                pitch = targetPitch = DirectedPitch;
+                snapping = false;
+            }
             ApplyPose();
         }
 
@@ -120,15 +133,16 @@ namespace Phainon.Cockpit
             float ny = Mathf.PerlinNoise(0.7f, time) - 0.5f;
             float nz = Mathf.PerlinNoise(time, time * 0.7f) - 0.5f;
 
-            Vector3 shakeAngles = new Vector3(nx, ny, nz * 0.6f) * (2f * settings.maxShakeDegrees * smoothedVibration);
-            Vector3 shakeOffset = new Vector3(ny, nx, 0f) * (2f * settings.maxShakeMetres * smoothedVibration);
+            float shake = GameSettings.ReducedEffects ? 0f : smoothedVibration;
+            Vector3 shakeAngles = new Vector3(nx, ny, nz * 0.6f) * (2f * settings.maxShakeDegrees * shake);
+            Vector3 shakeOffset = new Vector3(ny, nx, 0f) * (2f * settings.maxShakeMetres * shake);
 
             // Sustained acceleration presses the crew back into the seat.
             smoothedG = Mathf.Lerp(smoothedG, (float)craft.Flight.GLoad, 1f - Mathf.Exp(-2f * dt));
             Vector3 gOffset = new Vector3(0f, -0.004f, -0.010f) * Mathf.Clamp(smoothedG - 1f, 0f, 4f);
 
             transform.localPosition = restPosition + shakeOffset + gOffset;
-            transform.localRotation = Quaternion.Euler(pitch, yaw, 0f) * Quaternion.Euler(shakeAngles);
+            transform.localRotation = Quaternion.Euler(pitch, yaw, Directed ? DirectedRoll : 0f) * Quaternion.Euler(shakeAngles);
         }
 
         private void UpdateCursor(bool flying)

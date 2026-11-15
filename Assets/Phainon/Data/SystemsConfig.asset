@@ -36,7 +36,15 @@ MonoBehaviour:
     navAlignSeconds: 6
     commsAcquireSeconds: 3.5
     oxygenStartFraction: 0.98
-    oxygenUsePerSecond: 0.0000011
+    oxygenUsePerSecond: 0.00000054
+    regulatorLeakPerSecond: 0.00012
+    cabinAirEnduranceSeconds: 10800
+    lowCabinAirFraction: 0.25
+    hypoxiaPressureKpa: 55
+    lowCabinTempC: 8
+    survivableMinTempC: -8
+    survivableMaxTempC: 46
+    crewIncapacitationSeconds: 240
     nominalCabinPressureKpa: 101.3
     unpoweredCabinPressureKpa: 94
     cabinPressureTimeConstant: 5

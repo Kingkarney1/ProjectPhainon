@@ -42,8 +42,21 @@ namespace Phainon.Simulation
 
         // Life support.
         public double oxygenStartFraction = 0.98;
-        /// <summary>The reserve lasts about ten days.</summary>
-        public double oxygenUsePerSecond = 0.0000011;
+        /// <summary>The reserve lasts about three weeks.</summary>
+        public double oxygenUsePerSecond = 0.00000054;
+        /// <summary>Share of the reserve lost each second through a stuck regulator.</summary>
+        public double regulatorLeakPerSecond = 0.00012;
+        /// <summary>Seconds the cabin air stays breathable once nothing is refreshing it.</summary>
+        public double cabinAirEnduranceSeconds = 10800;
+        public double lowCabinAirFraction = 0.25;
+        /// <summary>Below this pressure the crew cannot stay conscious.</summary>
+        public double hypoxiaPressureKpa = 55.0;
+        public double lowCabinTempC = 8.0;
+        /// <summary>Outside these temperatures the crew cannot keep working.</summary>
+        public double survivableMinTempC = -8.0;
+        public double survivableMaxTempC = 46.0;
+        /// <summary>Seconds the crew last in a cabin that cannot support them before the flight is lost.</summary>
+        public double crewIncapacitationSeconds = 240;
         public double nominalCabinPressureKpa = 101.3;
         public double unpoweredCabinPressureKpa = 94.0;
         /// <summary>Seconds for pressure to settle with the cabin loop running.</summary>

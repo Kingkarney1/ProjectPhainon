@@ -1,4 +1,6 @@
+using Phainon.Audio;
 using Phainon.Cockpit;
+using Phainon.Story;
 using Phainon.UI;
 using TMPro;
 using UnityEngine;
@@ -32,7 +34,7 @@ namespace Phainon.EditorTools
         }
 
         public void Build(SpacecraftController spacecraft, GameManager game, CockpitInteractionManager interaction,
-            CockpitControlRouter router, CockpitCameraController cockpitCamera)
+            CockpitControlRouter router, CockpitCameraController cockpitCamera, Camera viewCamera, AudioManager audio)
         {
             var canvasObject = new GameObject("Interface Canvas", typeof(RectTransform));
             canvasObject.layer = LayerMask.NameToLayer("UI");
@@ -53,7 +55,48 @@ namespace Phainon.EditorTools
             eventSystem.AddComponent<InputSystemUIInputModule>();
 
             BuildHud(spacecraft, game, interaction, router, cockpitCamera);
+            BuildStorySequences(spacecraft, game, cockpitCamera, viewCamera, audio);
             BuildMenus(spacecraft, game);
+        }
+
+        /// <summary>The story's two full-screen sequences: the wake-up in the seat, and over it the introduction.</summary>
+        private void BuildStorySequences(SpacecraftController spacecraft, GameManager game, CockpitCameraController cockpitCamera,
+            Camera viewCamera, AudioManager audio)
+        {
+            RectTransform wakeRoot = ui.Fill("Wake Up", canvasRect);
+            var wake = wakeRoot.gameObject.AddComponent<WakeUpSequence>();
+            wake.game = game;
+            wake.spacecraft = spacecraft;
+            wake.cockpitCamera = cockpitCamera;
+            wake.audioManager = audio;
+            wake.group = wakeRoot.gameObject.AddComponent<CanvasGroup>();
+            wake.group.blocksRaycasts = false;
+            // Haze first, so the eyelids and the dark close over it.
+            wake.haze = ui.Image(ui.Fill("Haze", wakeRoot), new Color(0.62f, 0.66f, 0.70f, 0f));
+            wake.lidTop = ui.Fill("Upper Eyelid", wakeRoot);
+            ui.Image(wake.lidTop, Color.black);
+            wake.lidBottom = ui.Fill("Lower Eyelid", wakeRoot);
+            ui.Image(wake.lidBottom, Color.black);
+            wake.black = ui.Image(ui.Fill("Dark", wakeRoot), Color.black);
+
+            RectTransform introRoot = ui.Fill("Introduction", canvasRect);
+            var intro = introRoot.gameObject.AddComponent<IntroSequence>();
+            intro.game = game;
+            intro.spacecraft = spacecraft;
+            intro.campaign = assets.Story;
+            intro.cockpitCamera = cockpitCamera;
+            intro.viewCamera = viewCamera;
+            intro.skyMask = 1 << BuildPaths.LayerEnvironment;
+            intro.group = introRoot.gameObject.AddComponent<CanvasGroup>();
+            intro.group.blocksRaycasts = false;
+            // A light veil keeps the words readable over the brightest stars.
+            ui.Image(ui.Fill("Veil", introRoot), new Color(0f, 0f, 0f, 0.35f));
+            RectTransform words = Pinned("Line", introRoot, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1300f, 400f));
+            intro.line = ui.Text(words, "", 40f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Normal, true);
+            intro.line.lineSpacing = 12f;
+            RectTransform skip = Pinned("Skip Hint", introRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(600f, 24f));
+            ui.Text(skip, "Space to skip", 15f, new Color(theme.textDim.r, theme.textDim.g, theme.textDim.b, 0.7f), TextAlignmentOptions.Center);
+            intro.blackout = ui.Image(ui.Fill("Blackout", introRoot), new Color(0f, 0f, 0f, 0f));
         }
 
         /// <summary>A rect pinned to a point of its parent (anchor) by its own pivot, offset in pixels.</summary>
@@ -129,10 +172,27 @@ namespace Phainon.EditorTools
 
             // Key reminder, bottom left.
             RectTransform keys = Pinned("Key Reminder", root, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(28f, 22f), new Vector2(1300f, 26f));
-            ui.Text(keys, "RMB look    LMB operate    Scroll adjust    1-6 views    Z zoom    Shift / Ctrl throttle    W S A D Q E attitude    7 8 9 radio reply    C radio log    , . time rate    Esc pause",
+            ui.Text(keys, "RMB look    LMB operate    Scroll adjust    1-6 views    Z zoom    Shift / Ctrl throttle    W S A D Q E attitude    7 8 9 radio    C radio log    J log    , . time rate    Esc pause",
                 15f, new Color(theme.textDim.r, theme.textDim.g, theme.textDim.b, 0.8f), TextAlignmentOptions.Left);
 
             BuildComms(root, spacecraft, game);
+            BuildJournal(root, spacecraft, game);
+        }
+
+        /// <summary>The astronaut's log, left of centre and clear of the radio. Shown with J on a story mission.</summary>
+        private void BuildJournal(RectTransform root, SpacecraftController spacecraft, GameManager game)
+        {
+            RectTransform panel = Pinned("Log", root, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -210f), new Vector2(760f, 760f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            ui.Image("Accent", panel, 0f, 18f, 4f, 724f, theme.accentBlue);
+            ui.Text("Title", panel, 22f, 10f, 500f, 22f, "LOG   new first   J closes", 14f, theme.textDim, TextAlignmentOptions.Left, FontStyles.Bold);
+
+            var journal = root.gameObject.AddComponent<JournalPanel>();
+            journal.spacecraft = spacecraft;
+            journal.game = game;
+            journal.theme = theme;
+            journal.panel = panel.gameObject;
+            journal.body = ui.Text("Entries", panel, 22f, 40f, 716f, 706f, "", 17f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
         }
 
         /// <summary>The radio panel, top right and clear of the displays, with the message log below it.</summary>
@@ -188,6 +248,53 @@ namespace Phainon.EditorTools
             BuildPause(root);
             BuildComplete(root);
             BuildFailed(root);
+            BuildSettings(root);
+            BuildCredits(root);
+            BuildConfirm(root);
+        }
+
+        private void BuildSettings(RectTransform root)
+        {
+            RectTransform panel = Pinned("Settings", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(700f, 470f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.settingsPanel = panel.gameObject;
+            ui.Text("Heading", panel, 0f, 40f, 700f, 50f, "SETTINGS", 38f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Image("Rule", panel, 150f, 100f, 400f, 2f, theme.accentBlue);
+            Menus.volumeButton = MenuButton(panel, 110f, 132f, 480f, "VOLUME   100%", false);
+            Menus.effectsButton = MenuButton(panel, 110f, 212f, 480f, "VISUAL EFFECTS   FULL", false);
+            ui.Text("Note", panel, 90f, 286f, 520f, 60f,
+                "Reduced removes flicker, haze and camera shake, and shortens the wake-up to a plain fade.",
+                17f, theme.textDim, TextAlignmentOptions.Top, FontStyles.Normal, true);
+            Menus.settingsBackButton = MenuButton(panel, 200f, 366f, 300f, "BACK", true);
+        }
+
+        private void BuildCredits(RectTransform root)
+        {
+            RectTransform panel = Pinned("Credits", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 560f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.creditsPanel = panel.gameObject;
+            ui.Text("Heading", panel, 0f, 40f, 900f, 50f, "CREDITS", 38f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Image("Rule", panel, 250f, 100f, 400f, 2f, theme.accentBlue);
+            ui.Text("Text", panel, 80f, 126f, 740f, 320f,
+                "<b>Earth</b>   NASA Blue Marble, Land, Ocean, Ice composite. Public domain.\n\n" +
+                "<b>Jupiter</b>   Cassini cylindrical map, PIA07782. NASA / JPL / Space Science Institute. Public domain.\n\n" +
+                "<b>Type</b>   Liberation Sans and TextMesh Pro, supplied with Unity.\n\n" +
+                "Everything else, including every sound, is generated by this project's own code.\n\n" +
+                "The spacecraft is fictional and is not affiliated with any space agency.",
+                20f, theme.textPrimary, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
+            Menus.creditsBackButton = MenuButton(panel, 300f, 462f, 300f, "BACK", true);
+        }
+
+        private void BuildConfirm(RectTransform root)
+        {
+            RectTransform panel = Pinned("New Story Confirmation", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760f, 360f));
+            ui.Image(panel, PanelColor, assets.RoundedPanel, true);
+            Menus.confirmPanel = panel.gameObject;
+            ui.Text("Heading", panel, 0f, 40f, 760f, 50f, "START A NEW STORY?", 36f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            ui.Text("Text", panel, 80f, 110f, 600f, 80f, "There is a saved story. Starting again replaces it, and it cannot be brought back.",
+                21f, theme.textDim, TextAlignmentOptions.Top, FontStyles.Normal, true);
+            Menus.confirmNoButton = MenuButton(panel, 70f, 240f, 290f, "KEEP MY STORY", true);
+            Menus.confirmYesButton = MenuButton(panel, 400f, 240f, 290f, "START AGAIN", false);
         }
 
         private void BuildMainMenu(RectTransform root)
@@ -195,17 +302,23 @@ namespace Phainon.EditorTools
             RectTransform panel = ui.Fill("Main Menu", root);
             Menus.mainMenuPanel = panel.gameObject;
 
-            RectTransform block = Pinned("Title Block", panel, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(150f, 40f), new Vector2(1100f, 620f));
+            RectTransform block = Pinned("Title Block", panel, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(150f, 20f), new Vector2(1100f, 800f));
             ui.Text("Programme", block, 0f, 0f, 1100f, 32f, "PHAINON FLIGHT SYSTEMS", 22f, theme.textDim, TextAlignmentOptions.Left, FontStyles.Bold).characterSpacing = 18f;
             ui.Text("Title", block, 0f, 46f, 1100f, 110f, assets.Mission.spec.missionName, 96f, theme.textPrimary, TextAlignmentOptions.Left, FontStyles.Bold);
             ui.Text("Subtitle", block, 4f, 164f, 1100f, 44f, assets.Mission.spec.missionSubtitle, 34f, theme.accentBlue, TextAlignmentOptions.Left, FontStyles.Bold).characterSpacing = 22f;
             ui.Image("Rule", block, 4f, 226f, 520f, 3f, theme.accentBlue);
             ui.Text("Blurb", block, 4f, 246f, 760f, 96f,
-                "Take the command seat. Bring the spacecraft to life, fly it off the pad, through staging and into orbit.",
+                "A solitary expedition into deep space, and the launch that began it. Take the command seat.",
                 24f, theme.textDim, TextAlignmentOptions.TopLeft, FontStyles.Normal, true);
 
-            Menus.startButton = MenuButton(block, 4f, 372f, 420f, "START MISSION", true);
-            Menus.quitButton = MenuButton(block, 4f, 452f, 420f, "QUIT", false);
+            const float step = 70f;
+            float y = 336f;
+            Menus.continueStoryButton = MenuButton(block, 4f, y, 420f, "CONTINUE STORY", true); y += step;
+            Menus.newStoryButton = MenuButton(block, 4f, y, 420f, "NEW STORY", true); y += step;
+            Menus.startButton = MenuButton(block, 4f, y, 420f, "EARTH LAUNCH MISSION", false); y += step;
+            Menus.settingsButton = MenuButton(block, 4f, y, 420f, "SETTINGS", false); y += step;
+            Menus.creditsButton = MenuButton(block, 4f, y, 420f, "CREDITS", false); y += step;
+            Menus.quitButton = MenuButton(block, 4f, y, 420f, "QUIT", false);
 
             RectTransform footer = Pinned("Footer", panel, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(154f, 48f), new Vector2(1200f, 26f));
             ui.Text(footer, "VERTICAL SLICE  " + Application.version + "    A fictional spacecraft. Not affiliated with any space agency.",
@@ -261,7 +374,7 @@ namespace Phainon.EditorTools
 
         private void BuildPause(RectTransform root)
         {
-            RectTransform panel = Pinned("Pause", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 640f));
+            RectTransform panel = Pinned("Pause", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 740f));
             ui.Image(panel, PanelColor, assets.RoundedPanel, true);
             Menus.pausePanel = panel.gameObject;
 
@@ -271,7 +384,10 @@ namespace Phainon.EditorTools
             Menus.pauseRestartButton = MenuButton(panel, 110f, 212f, 400f, "RESTART MISSION", false);
             Menus.pauseMenuButton = MenuButton(panel, 110f, 292f, 400f, "MAIN MENU", false);
             Menus.pauseQuitButton = MenuButton(panel, 110f, 372f, 400f, "QUIT", false);
-            ui.Text("Reminder", panel, 60f, 462f, 500f, 150f,
+            // Story missions only; the menu hides it otherwise.
+            Menus.saveButton = MenuButton(panel, 110f, 452f, 400f, "SAVE STORY", false);
+            Menus.saveStatus = ui.Text("Save Status", panel, 60f, 518f, 500f, 24f, "", 16f, theme.accentBlue, TextAlignmentOptions.Center);
+            ui.Text("Reminder", panel, 60f, 562f, 500f, 150f,
                 "RMB look   LMB operate   Scroll adjust\n1-6 views   Z zoom   H guide\nShift / Ctrl throttle   T full   X idle\nW S A D Q E attitude",
                 17f, theme.textDim, TextAlignmentOptions.Top, FontStyles.Normal, true);
         }
@@ -282,12 +398,12 @@ namespace Phainon.EditorTools
             ui.Image(panel, PanelColor, assets.RoundedPanel, true);
             Menus.completePanel = panel.gameObject;
 
-            ui.Text("Heading", panel, 0f, 40f, 820f, 60f, "ORBIT ACHIEVED", 52f, theme.nominalGreen, TextAlignmentOptions.Center, FontStyles.Bold);
-            ui.Text("Sub", panel, 0f, 104f, 820f, 34f, "MISSION COMPLETE   WELCOME TO OUTER SPACE", 22f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
+            Menus.completeHeading = ui.Text("Heading", panel, 0f, 40f, 820f, 60f, "ORBIT ACHIEVED", 52f, theme.nominalGreen, TextAlignmentOptions.Center, FontStyles.Bold);
+            Menus.completeSub = ui.Text("Sub", panel, 0f, 104f, 820f, 34f, "MISSION COMPLETE   WELCOME TO OUTER SPACE", 22f, theme.textPrimary, TextAlignmentOptions.Center, FontStyles.Bold);
             ui.Image("Rule", panel, 160f, 152f, 500f, 2f, theme.nominalGreen);
             Menus.completeSummary = ui.Text("Summary", panel, 150f, 176f, 520f, 150f, "", 22f, theme.textPrimary, TextAlignmentOptions.TopLeft);
-            ui.Text("Note", panel, 110f, 330f, 600f, 56f,
-                "The spacecraft is still live. Continue the flight to stay in orbit, or to drop the upper stage and leave Earth.", 18f, theme.textDim, TextAlignmentOptions.Center, FontStyles.Normal, true);
+            Menus.completeNote = ui.Text("Note", panel, 90f, 322f, 640f, 70f,
+                "The flight is held here. Continue it to stay in orbit, or to drop the upper stage and leave Earth.", 18f, theme.textDim, TextAlignmentOptions.Center, FontStyles.Normal, true);
             Menus.continueButton = MenuButton(panel, 210f, 396f, 400f, "CONTINUE FLIGHT", true);
             Menus.completeRestartButton = MenuButton(panel, 210f, 470f, 400f, "RESTART MISSION", false);
             Menus.completeMenuButton = MenuButton(panel, 210f, 544f, 400f, "MAIN MENU", false);

@@ -40,8 +40,11 @@ namespace Phainon.Cockpit
 
             float floodTarget = powered && craft.Settings.CabinLightsOn ? floodIntensity : standbyIntensity;
             flood = Mathf.Lerp(flood, floodTarget, k);
+            // On batteries alone in flight the bus sags, and the lights show it until the APU is back.
+            bool sagging = powered && !craft.Power.ApuOnline && craft.Mission.HasLiftedOff && !GameSettings.ReducedEffects;
+            float lit = sagging ? flood * (0.55f + 0.45f * Mathf.PerlinNoise(Time.time * 9f, 3.1f)) : flood;
             for (int i = 0; i < floodLights.Length; i++)
-                if (floodLights[i] != null) floodLights[i].intensity = flood;
+                if (floodLights[i] != null) floodLights[i].intensity = lit;
 
             if (floodFixtures != null && floodFixtures.Length > 0)
             {

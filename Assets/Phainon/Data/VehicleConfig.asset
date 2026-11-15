@@ -69,3 +69,4 @@ MonoBehaviour:
     maxYawDegrees: 25
     pitchTrimRangeDegrees: 8
     minThrustLimit: 0.4
+    windowTiltDegrees: 30

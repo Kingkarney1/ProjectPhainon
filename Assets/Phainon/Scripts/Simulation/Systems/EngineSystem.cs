@@ -6,6 +6,14 @@ namespace Phainon.Simulation
 
     public enum EngineShutdownReason { Commanded, PropellantDepleted, FeedPressureLost, Abort }
 
+    [Serializable]
+    public class EngineSnapshot
+    {
+        public int state, activeStage;
+        public double throttle, thrustLimit = 1.0, thrustFactor = 1.0, spool, tailOff, cutoffOutput, thrust, output, chamberTemp;
+        public bool interlockOpen, safed;
+    }
+
     /// <summary>
     /// Main propulsion. Owns the active stage, ignition interlocks, spool-up and thrust output.
     /// Thrust follows the throttle lever, capped by the thrust-limit dial.
@@ -52,6 +60,8 @@ namespace Phainon.Simulation
         public double OutputFraction { get; private set; }
         public double ChamberTemperatureK { get; private set; }
         public bool IsBurning { get { return State == EngineState.Igniting || State == EngineState.Running; } }
+        /// <summary>Latched when the flight is over: the engine is shut down and cannot be lit again.</summary>
+        public bool Safed { get; private set; }
 
         public event Action<int> Ignited;
         public event Action<int, EngineShutdownReason> ShutDown;
@@ -61,6 +71,7 @@ namespace Phainon.Simulation
         public CommandResult TryIgnite(bool busPowered, bool apuOnline)
         {
             if (IsBurning) return CommandResult.Rejected("ENGINE ALREADY RUNNING");
+            if (Safed) return CommandResult.Rejected("IGNITION INHIBITED - VEHICLE SAFED");
             if (!busPowered) return CommandResult.Rejected("IGNITION INHIBITED - MAIN BUS UNPOWERED");
             if (!apuOnline) return CommandResult.Rejected("IGNITION INHIBITED - APU OFFLINE");
             if (!fuel.FeedReady) return CommandResult.Rejected("IGNITION INHIBITED - FUEL FEED NOT READY");
@@ -78,6 +89,53 @@ namespace Phainon.Simulation
             if (!IsBurning) return CommandResult.Rejected("ENGINE NOT RUNNING");
             EndBurn(reason);
             return CommandResult.Ok("ENGINE CUTOFF");
+        }
+
+        /// <summary>Shuts the engine down for good. Called when the flight has ended.</summary>
+        public void Safe()
+        {
+            if (IsBurning) EndBurn(EngineShutdownReason.Abort);
+            Safed = true;
+        }
+
+        /// <summary>Starts the flight with earlier stages already gone. Used when a mission begins in space.</summary>
+        public void BeginAtStage(int stage)
+        {
+            ActiveStage = (int)SimMath.Clamp(stage, 0, vehicle.stages.Length - 1);
+            State = EngineState.Off;
+            spool = 0.0;
+            tailOff = 0.0;
+            cutoffOutput = 0.0;
+            ThrustNewtons = 0.0;
+            OutputFraction = 0.0;
+        }
+
+        public EngineSnapshot Capture()
+        {
+            return new EngineSnapshot
+            {
+                state = (int)State, activeStage = ActiveStage, throttle = ThrottleCommand, thrustLimit = ThrustLimit,
+                thrustFactor = ThrustFactor, spool = spool, tailOff = tailOff, cutoffOutput = cutoffOutput,
+                thrust = ThrustNewtons, output = OutputFraction, chamberTemp = ChamberTemperatureK,
+                interlockOpen = IgnitionInterlockOpen, safed = Safed
+            };
+        }
+
+        public void Restore(EngineSnapshot s)
+        {
+            State = (EngineState)s.state;
+            ActiveStage = s.activeStage;
+            ThrottleCommand = s.throttle;
+            ThrustLimit = s.thrustLimit;
+            ThrustFactor = s.thrustFactor;
+            spool = s.spool;
+            tailOff = s.tailOff;
+            cutoffOutput = s.cutoffOutput;
+            ThrustNewtons = s.thrust;
+            OutputFraction = s.output;
+            ChamberTemperatureK = s.chamberTemp;
+            IgnitionInterlockOpen = s.interlockOpen;
+            Safed = s.safed;
         }
 
         /// <summary>Drops the spent stage. Only valid with the engine shut down.</summary>

@@ -20,6 +20,8 @@ namespace Phainon.Simulation
         Abort = 18,
         MasterAlarm = 19,
         CameraSelect = 20,
+        Observe = 21,
+        TransmitData = 22,
 
         // Toggle switches.
         BatteryA = 30,
@@ -32,6 +34,7 @@ namespace Phainon.Simulation
         Rcs = 37,
         ExternalCamera = 38,
         CabinLights = 39,
+        SciencePower = 40,
 
         // Continuous controls.
         Throttle = 50,
@@ -40,7 +43,8 @@ namespace Phainon.Simulation
         DisplayBrightness = 53,
         CabinTemperature = 54,
         PitchTrim = 55,
-        RollCommand = 56
+        RollCommand = 56,
+        InstrumentSelect = 57
     }
 
     /// <summary>Panel lamps and annunciators driven by spacecraft state.</summary>
@@ -58,6 +62,8 @@ namespace Phainon.Simulation
         Abort = 18,
         MasterAlarm = 19,
         CameraSelect = 20,
+        Observe = 21,
+        TransmitData = 22,
 
         BatteryA = 30,
         BatteryB = 31,
@@ -69,6 +75,7 @@ namespace Phainon.Simulation
         Rcs = 37,
         ExternalCamera = 38,
         CabinLights = 39,
+        SciencePower = 40,
 
         // Status-only annunciators.
         EngineRunning = 70,

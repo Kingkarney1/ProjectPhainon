@@ -24,6 +24,13 @@ namespace Phainon.Cockpit
             ApplyPose();
         }
 
+        public override void SetWithoutNotify(float value)
+        {
+            isOn = value > 0.5f;
+            position = isOn ? 1f : 0f;
+            ApplyPose();
+        }
+
         public override void OnPress()
         {
             isOn = !isOn;

@@ -2,10 +2,34 @@ using System;
 
 namespace Phainon.Simulation
 {
+    /// <summary>What the flight computer steers towards when guidance is active.</summary>
+    public enum AttitudeHold
+    {
+        /// <summary>The ascent profile: only meaningful under thrust.</summary>
+        Profile,
+        /// <summary>Nose along the flight path.</summary>
+        Prograde,
+        /// <summary>Nose against the flight path, for slowing down.</summary>
+        Retrograde
+    }
+
+    [Serializable]
+    public class AttitudeSnapshot
+    {
+        public double pitch = 90.0;
+        public double yaw;
+        public double roll;
+        public double rollManualOffset;
+        public bool rcsEnabled;
+        public double pitchTrim;
+        public double rollDial;
+    }
+
     /// <summary>
     /// Vehicle attitude: pitch above the local horizon, yaw out of the flight plane and roll about the nose.
+    /// Pitch is a full circle: 0 is level and facing downrange, 90 straight up, 180 level and facing back.
     /// With guidance active the flight computer steers pitch: along the ascent profile while the
-    /// engine burns, or along the flight path (prograde) in ORBIT mode. Otherwise the crew fly it by hand.
+    /// engine burns, or along or against the flight path in the two hold modes. Otherwise the crew fly it by hand.
     /// </summary>
     public class AttitudeController
     {
@@ -39,14 +63,66 @@ namespace Phainon.Simulation
         public bool HasControlAuthority { get; private set; }
         public bool RcsFiring { get; private set; }
 
-        public void Tick(double dt, FlightModel flight, EngineSystem engine, bool guidanceActive, bool progradeHold, bool busPowered, bool apuOnline)
+        /// <summary>
+        /// Angle between the forward window's line of sight and the centre of the body below, in
+        /// degrees. The window looks below the thrust axis by the vehicle's window tilt.
+        /// </summary>
+        public double WindowOffNadirDegrees
+        {
+            get
+            {
+                double pitch = PitchDegrees * SimMath.Deg2Rad;
+                double roll = RollDegrees * SimMath.Deg2Rad;
+                double tilt = vehicle.windowTiltDegrees * SimMath.Deg2Rad;
+                // Upward part of the sight line. The tilt is fixed in the cabin, so rolling swings the
+                // window off to one side; yaw turns the vehicle about the vertical and changes nothing here.
+                double up = Math.Cos(tilt) * Math.Sin(pitch) - Math.Sin(tilt) * Math.Cos(roll) * Math.Cos(pitch);
+                return Math.Acos(SimMath.Clamp(-up, -1.0, 1.0)) * SimMath.Rad2Deg;
+            }
+        }
+
+        /// <summary>Points the vehicle without turning it there. Used when a flight starts away from the pad.</summary>
+        public void SetAttitude(double pitchDegrees, double yawDegrees, double rollDegrees)
+        {
+            PitchDegrees = SimMath.WrapDegrees(pitchDegrees);
+            YawDegrees = yawDegrees;
+            RollDegrees = SimMath.WrapDegrees(rollDegrees);
+            rollManualOffset = SimMath.WrapDegrees(rollDegrees - RollDial * 180.0);
+        }
+
+        public AttitudeSnapshot Capture()
+        {
+            return new AttitudeSnapshot
+            {
+                pitch = PitchDegrees, yaw = YawDegrees, roll = RollDegrees, rollManualOffset = rollManualOffset,
+                rcsEnabled = RcsEnabled, pitchTrim = PitchTrim, rollDial = RollDial
+            };
+        }
+
+        public void Restore(AttitudeSnapshot s)
+        {
+            PitchDegrees = s.pitch;
+            YawDegrees = s.yaw;
+            RollDegrees = s.roll;
+            rollManualOffset = s.rollManualOffset;
+            RcsEnabled = s.rcsEnabled;
+            PitchTrim = s.pitchTrim;
+            RollDial = s.rollDial;
+        }
+
+        public void Tick(double dt, FlightModel flight, EngineSystem engine, bool guidanceActive, AttitudeHold hold, bool busPowered, bool apuOnline)
         {
             bool gimbal = engine.IsBurning && apuOnline;
             bool rcs = RcsEnabled && busPowered;
             HasControlAuthority = gimbal || rcs;
             RcsFiring = false;
 
-            GuidancePitchDegrees = progradeHold ? flight.FlightPathAngleDegrees : ComputeGuidancePitch(flight, engine);
+            switch (hold)
+            {
+                case AttitudeHold.Prograde: GuidancePitchDegrees = flight.FlightPathAngleDegrees; break;
+                case AttitudeHold.Retrograde: GuidancePitchDegrees = SimMath.WrapDegrees(flight.FlightPathAngleDegrees + 180.0); break;
+                default: GuidancePitchDegrees = ComputeGuidancePitch(flight, engine); break;
+            }
 
             if (!flight.Released)
             {
@@ -56,17 +132,20 @@ namespace Phainon.Simulation
             }
             if (!HasControlAuthority) return;
 
-            // The ascent profile only means something under thrust. Prograde hold also works while coasting.
-            if (guidanceActive && (engine.IsBurning || progradeHold))
+            // The ascent profile only means something under thrust. The holds also work while coasting.
+            if (guidanceActive && (engine.IsBurning || hold != AttitudeHold.Profile))
             {
                 double target = GuidancePitchDegrees + PitchTrim * vehicle.pitchTrimRangeDegrees;
-                if (!gimbal && (Math.Abs(target - PitchDegrees) > 0.05 || Math.Abs(YawDegrees) > 0.05)) RcsFiring = true;
-                PitchDegrees = SimMath.MoveTowards(PitchDegrees, target, vehicle.guidancePitchRateDegPerSec * dt);
+                // The short way round: from 170 to -170 is twenty degrees, not three hundred and forty.
+                double error = SimMath.WrapDegrees(target - PitchDegrees);
+                if (!gimbal && (Math.Abs(error) > 0.05 || Math.Abs(YawDegrees) > 0.05)) RcsFiring = true;
+                double step = vehicle.guidancePitchRateDegPerSec * dt;
+                PitchDegrees = SimMath.WrapDegrees(PitchDegrees + SimMath.Clamp(error, -step, step));
                 YawDegrees = SimMath.MoveTowards(YawDegrees, 0.0, vehicle.manualYawRateDegPerSec * dt);
             }
             else
             {
-                PitchDegrees = SimMath.Clamp(PitchDegrees + PitchInput * vehicle.manualPitchRateDegPerSec * dt, -90.0, 90.0);
+                PitchDegrees = SimMath.WrapDegrees(PitchDegrees + PitchInput * vehicle.manualPitchRateDegPerSec * dt);
                 YawDegrees = SimMath.Clamp(YawDegrees + YawInput * vehicle.manualYawRateDegPerSec * dt,
                     -vehicle.maxYawDegrees, vehicle.maxYawDegrees);
                 if (rcs && (Math.Abs(PitchInput) > 0.05 || Math.Abs(YawInput) > 0.05)) RcsFiring = true;
@@ -93,7 +172,7 @@ namespace Phainon.Simulation
                 -vehicle.maxTargetSinkRate, vehicle.maxTargetClimbRate);
 
             double r = flight.Radius;
-            double gravity = FlightModel.EarthMu / (r * r);
+            double gravity = flight.Body.mu / (r * r);
             double centrifugal = flight.TangentialVelocity * flight.TangentialVelocity / r;
             double neededRadialAccel = (climbTarget - flight.VerticalSpeed) / vehicle.verticalSpeedTimeConstant
                                        + gravity - centrifugal;

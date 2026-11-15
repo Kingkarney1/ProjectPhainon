@@ -348,6 +348,14 @@ namespace Phainon.EditorTools
             Controls.Switch(p, new Vector2(-pitch, bottom), ControlId.FuelPump, "FUEL PUMP");
             Controls.Switch(p, new Vector2(0f, bottom), ControlId.TankPress, "TANK PRESS");
             Controls.Switch(p, new Vector2(pitch, bottom), ControlId.CommAntenna, "S-BAND XMIT");
+
+            // Science payload, either side of them: power and instrument choice on the left, observe and send on the right.
+            Controls.AddLabel("SCIENCE", p, new Vector2(-0.235f, -0.152f), 6f, false);
+            Controls.AddLabel("DATA", p, new Vector2(0.245f, -0.152f), 6f, false);
+            Controls.Switch(p, new Vector2(-0.19f, bottom), ControlId.SciencePower, "SCIENCE PWR");
+            Controls.Dial(p, new Vector2(-0.275f, bottom - 0.012f), ControlId.InstrumentSelect, "INSTRUMENT", 0f, "{0}", 0f, 2f, new[] { "CAM", "SPEC", "RAD" });
+            Controls.Button(p, new Vector2(0.20f, bottom), ControlId.Observe, "OBSERVE", ControlFactory.Blue);
+            Controls.Button(p, new Vector2(0.29f, bottom), ControlId.TransmitData, "TRANSMIT", ControlFactory.Blue);
         }
 
         // ---------------------------------------------------------------- overhead panel
@@ -404,7 +412,7 @@ namespace Phainon.EditorTools
             Transform p = Panel("Flight Control Console (Right)", new Vector3(0.62f, 0.725f, 0.36f), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("FLIGHT CONTROL", p, new Vector2(0f, 0.268f), 8f, false);
 
-            Controls.Dial(p, new Vector2(-0.085f, 0.135f), ControlId.NavMode, "NAV MODE", 0f, "{0}", 0f, 2f, new[] { "STBY", "ASCENT", "ORBIT" });
+            Controls.Dial(p, new Vector2(-0.085f, 0.135f), ControlId.NavMode, "NAV MODE", 0f, "{0}", 0f, 3f, new[] { "STBY", "ASCENT", "ORBIT", "RETRO" });
             Controls.Switch(p, new Vector2(0.060f, 0.155f), ControlId.Guidance, "GUIDANCE");
             Controls.Switch(p, new Vector2(0.135f, 0.155f), ControlId.Rcs, "RCS");
             Controls.Dial(p, new Vector2(-0.085f, -0.030f), ControlId.PitchTrim, "PITCH TRIM", 0.5f, "{0:+0.0;-0.0} DEG", -8f, 8f);

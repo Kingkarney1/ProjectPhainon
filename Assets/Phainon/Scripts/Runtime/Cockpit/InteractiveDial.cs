@@ -55,6 +55,14 @@ namespace Phainon.Cockpit
             ApplyPose();
         }
 
+        public override void SetWithoutNotify(float next)
+        {
+            value = IsDetented ? Mathf.Clamp(Mathf.Round(next), 0f, detents - 1) / (detents - 1) : Mathf.Clamp01(next);
+            shownValue = value;
+            lastTickStep = Mathf.RoundToInt(value * 20f);
+            ApplyPose();
+        }
+
         public override void OnDrag(Vector2 pixelDelta)
         {
             float sensitivity = settings != null ? settings.dialDragSensitivity : 0.0035f;

@@ -31,6 +31,13 @@ namespace Phainon.Simulation
         public double ignitionWindowSeconds = 6;
         /// <summary>Thrust-to-weight ratio needed before the hold-down clamps release.</summary>
         public double liftoffThrustToWeight = 1.03;
+        /// <summary>Both ascent stages must hold more than this share of their propellant to commit to launch.</summary>
+        public double launchMinimumPropellantFraction = 0.97;
+        /// <summary>
+        /// Share of a tank the ground supply replaces each second while the vehicle stands on the
+        /// pad with the engine off, so a count that was held after ignition can be picked up again.
+        /// </summary>
+        public double padToppingFractionPerSecond = 0.004;
 
         public double stageSeparationMinAltitudeMeters = 40000;
         public double orbitMinPeriapsisMeters = 150000;

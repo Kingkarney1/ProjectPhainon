@@ -2,6 +2,13 @@ using System;
 
 namespace Phainon.Simulation
 {
+    [Serializable]
+    public class PowerSnapshot
+    {
+        public bool batteryAEnabled, batteryBEnabled, masterBus, apuEnabled, apuTripped, batteryAFaulted, wasPowered;
+        public double chargeA = 1.0, chargeB = 1.0, apuSpool, busVoltage;
+    }
+
     /// <summary>
     /// Electrical power: two batteries feeding a master bus, plus an auxiliary power unit
     /// that carries the load and recharges the batteries once started.
@@ -68,6 +75,38 @@ namespace Phainon.Simulation
         {
             ApuTripped = true;
             apuSpool = 0.0;
+        }
+
+        /// <summary>Sets the batteries' state of charge, 0..1 each. Used when a flight starts part-way through.</summary>
+        public void SetCharge(double batteryA, double batteryB)
+        {
+            BatteryACharge = SimMath.Clamp01(batteryA);
+            BatteryBCharge = SimMath.Clamp01(batteryB);
+        }
+
+        public PowerSnapshot Capture()
+        {
+            return new PowerSnapshot
+            {
+                batteryAEnabled = BatteryAEnabled, batteryBEnabled = BatteryBEnabled, masterBus = MasterBusEnabled,
+                apuEnabled = ApuEnabled, apuTripped = ApuTripped, batteryAFaulted = BatteryAFaulted, wasPowered = wasPowered,
+                chargeA = BatteryACharge, chargeB = BatteryBCharge, apuSpool = apuSpool, busVoltage = BusVoltage
+            };
+        }
+
+        public void Restore(PowerSnapshot s)
+        {
+            BatteryAEnabled = s.batteryAEnabled;
+            BatteryBEnabled = s.batteryBEnabled;
+            MasterBusEnabled = s.masterBus;
+            ApuEnabled = s.apuEnabled;
+            ApuTripped = s.apuTripped;
+            BatteryAFaulted = s.batteryAFaulted;
+            wasPowered = s.wasPowered;
+            BatteryACharge = s.chargeA;
+            BatteryBCharge = s.chargeB;
+            apuSpool = s.apuSpool;
+            BusVoltage = s.busVoltage;
         }
 
         public void Tick(double dt, double loadWatts)

@@ -34,6 +34,7 @@ namespace Phainon.UI
         private float sinceMessage = 999f;
         private int shownSignal = int.MinValue;
         private int shownDelay = -1;
+        private string shownRequests = "";
 
         private void Start()
         {
@@ -73,15 +74,19 @@ namespace Phainon.UI
             UpdateSignal(spacecraft.Craft.Comms);
 
             CommsMessage prompt = radio.AwaitingReply;
-            if (prompt != shownPrompt) ShowReplies(prompt);
+            if (prompt != shownPrompt) { ShowReplies(prompt); shownRequests = ""; }
             if (prompt != null)
             {
                 for (int i = 0; i < input.Replies.Length; i++)
                     if (input.Replies[i].WasPressedThisFrame()) radio.Reply(i);
             }
+            else
+            {
+                UpdateRequests(input);
+            }
 
             sinceMessage += Time.deltaTime;
-            bool attention = prompt != null || logPanel.activeSelf || sinceMessage < attentionSeconds;
+            bool attention = prompt != null || logPanel.activeSelf || sinceMessage < attentionSeconds || shownRequests.Length > 0;
             group.alpha = Mathf.MoveTowards(group.alpha, attention ? 1f : restAlpha, Time.deltaTime * 2f);
         }
 
@@ -99,6 +104,25 @@ namespace Phainon.UI
                 ? "LINK  " + signal + "%" + (delay > 0 ? "   DELAY " + (delay / 10f).ToString("0.0") + " s" : "")
                 : (signal == -2 ? "ACQUIRING SIGNAL" : "NO LINK");
             signalText.color = signal >= 0 ? theme.nominalGreen : theme.cautionAmber;
+        }
+
+        /// <summary>With no question open, the reply keys offer the calls the crew can make to the ground.</summary>
+        private void UpdateRequests(PhainonInput input)
+        {
+            var requests = spacecraft.Craft.Comms.LinkEstablished ? radio.AvailableRequests : null;
+            int count = requests != null ? requests.Count : 0;
+            string key = count == 0 ? "" : count + requests[0].id;
+            if (key != shownRequests)
+            {
+                shownRequests = key;
+                for (int i = 0; i < replyRows.Length; i++)
+                {
+                    replyRows[i].gameObject.SetActive(i < count);
+                    if (i < count) replyRows[i].text = "<b>" + (i + 7) + "</b>   " + requests[i].requestLabel;
+                }
+            }
+            for (int i = 0; i < count && i < input.Replies.Length; i++)
+                if (input.Replies[i].WasPressedThisFrame()) { radio.Request(i); shownRequests = "?"; break; }
         }
 
         private void ShowReplies(CommsMessage prompt)

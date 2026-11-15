@@ -41,6 +41,12 @@ namespace Phainon
         [Tooltip("Blue light reflected into the cabin from the Earth below when in space.")]
         public Color earthshine = new Color(0.035f, 0.055f, 0.085f);
 
+        [Header("Away from Earth")]
+        [Tooltip("Sunlight at Jupiter as a share of sunlight in Earth orbit. Far dimmer in reality; this keeps the cabin readable.")]
+        public float deepSpaceSunScale = 0.55f;
+        [Tooltip("Light reflected into the cabin from Jupiter's clouds.")]
+        public Color jupiterShine = new Color(0.085f, 0.070f, 0.050f);
+
         [Header("Cloud layers (altitude and thickness in metres)")]
         public Vector2[] cloudLayers =
         {

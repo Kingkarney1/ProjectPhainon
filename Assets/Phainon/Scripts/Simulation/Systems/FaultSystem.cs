@@ -2,7 +2,16 @@ using System;
 
 namespace Phainon.Simulation
 {
-    public enum FaultId { ApuTrip = 0, FuelPump = 1, BatteryA = 2, NavPlatform = 3, Antenna = 4, WeakUpperEngine = 5 }
+    public enum FaultId { ApuTrip = 0, FuelPump = 1, BatteryA = 2, NavPlatform = 3, Antenna = 4, WeakUpperEngine = 5, OxygenRegulator = 6 }
+
+    [Serializable]
+    public class FaultSnapshot
+    {
+        public bool[] active = new bool[0];
+        public bool pending;
+        public int scheduled;
+        public double scheduledMet;
+    }
 
     /// <summary>
     /// Things that break in flight. A fault is a latch inside the system it damages, so its effect is
@@ -12,6 +21,8 @@ namespace Phainon.Simulation
     public class FaultSystem
     {
         public static readonly int Count = Enum.GetValues(typeof(FaultId)).Length;
+        /// <summary>The faults a launch can draw at random. Later ones only happen when a mission schedules them.</summary>
+        public const int RandomPoolCount = 6;
 
         private readonly Spacecraft craft;
         private readonly bool[] active = new bool[Count];
@@ -25,7 +36,7 @@ namespace Phainon.Simulation
 
             SystemsSpec spec = craft.SystemsSpec;
             var random = new Random(seed);
-            Scheduled = (FaultId)random.Next(Count);
+            Scheduled = (FaultId)random.Next(RandomPoolCount);
             ScheduledMetSeconds = SimMath.Lerp(spec.faultEarliestSeconds, spec.faultLatestSeconds, random.NextDouble());
             pending = true;
         }
@@ -40,9 +51,28 @@ namespace Phainon.Simulation
         public event Action<FaultId> Raised;
         public event Action<FaultId> Cleared;
 
+        public FaultSnapshot Capture()
+        {
+            return new FaultSnapshot { active = (bool[])active.Clone(), pending = pending, scheduled = (int)Scheduled, scheduledMet = ScheduledMetSeconds };
+        }
+
+        public void Restore(FaultSnapshot s)
+        {
+            bool any = false;
+            for (int i = 0; i < Count; i++)
+            {
+                active[i] = i < s.active.Length && s.active[i];
+                any |= active[i];
+            }
+            AnyActive = any;
+            pending = s.pending;
+            Scheduled = (FaultId)s.scheduled;
+            ScheduledMetSeconds = s.scheduledMet;
+        }
+
         public void Tick(double dt)
         {
-            if (pending && CanOccur(Scheduled))
+            if (pending && craft.Mission.MissionElapsedSeconds >= ScheduledMetSeconds && CanOccur(Scheduled))
             {
                 pending = false;
                 Inject(Scheduled);
@@ -71,6 +101,7 @@ namespace Phainon.Simulation
                 case FaultId.NavPlatform: craft.Navigation.Trip(); break;
                 case FaultId.Antenna: craft.Comms.FaultAntenna(); break;
                 case FaultId.WeakUpperEngine: craft.Engine.DegradeThrust(craft.SystemsSpec.weakEngineThrustFactor); break;
+                case FaultId.OxygenRegulator: craft.LifeSupport.FaultRegulator(); break;
             }
             active[(int)id] = true;
             AnyActive = true;
@@ -78,11 +109,10 @@ namespace Phainon.Simulation
         }
 
         /// <summary>A fault waits for a moment when the crew can both notice it and do something about it.</summary>
-        private bool CanOccur(FaultId id)
+        public bool CanOccur(FaultId id)
         {
             MissionController mission = craft.Mission;
             if (!mission.HasLiftedOff || mission.IsFailed) return false;
-            if (mission.MissionElapsedSeconds < ScheduledMetSeconds) return false;
             if (craft.Flight.AltitudeMeters < craft.SystemsSpec.faultMinAltitudeMeters) return false;
 
             switch (id)
@@ -93,6 +123,7 @@ namespace Phainon.Simulation
                 case FaultId.NavPlatform: return craft.Navigation.Aligned;
                 case FaultId.Antenna: return craft.Comms.LinkEstablished;
                 case FaultId.WeakUpperEngine: return craft.Engine.ActiveStage == 1 && craft.Engine.State == EngineState.Running;
+                case FaultId.OxygenRegulator: return craft.LifeSupport.Enabled && craft.Power.IsBusPowered;
                 default: return false;
             }
         }
@@ -109,6 +140,7 @@ namespace Phainon.Simulation
                 case FaultId.NavPlatform: return !craft.Navigation.Aligned;
                 case FaultId.Antenna: return craft.Comms.AntennaFaulted || !craft.Comms.LinkEstablished;
                 case FaultId.WeakUpperEngine: return craft.Engine.ThrustFactor < 1.0;
+                case FaultId.OxygenRegulator: return craft.LifeSupport.RegulatorFaulted || !craft.LifeSupport.Enabled;
                 default: return false;
             }
         }
@@ -119,44 +151,65 @@ namespace Phainon.Simulation
             control = ControlId.None;
             if (!AnyActive) return null;
 
-            if (active[(int)FaultId.FuelPump])
+            // Most pressing first: what starves the engine, then what loses the vehicle, then the rest.
+            FaultId[] order =
             {
-                control = ControlId.FuelPump;
-                if (!craft.Fuel.PumpsEnabled) return "Set FUEL PUMP back ON now.";
-                if (craft.Fuel.PumpFaulted) return "Feed pressure is dropping. Set FUEL PUMP OFF and straight back ON to restart the pump.";
-                control = ControlId.None;
-                return "Fuel pump restarted. Feed pressure is recovering.";
-            }
-            if (active[(int)FaultId.ApuTrip])
+                FaultId.FuelPump, FaultId.OxygenRegulator, FaultId.ApuTrip, FaultId.NavPlatform,
+                FaultId.Antenna, FaultId.BatteryA, FaultId.WeakUpperEngine
+            };
+            for (int i = 0; i < order.Length; i++)
             {
-                control = ControlId.Apu;
-                if (craft.Power.ApuTripped) return "The APU has tripped. Set the APU switch OFF to reset it.";
-                if (!craft.Power.ApuEnabled) return "Set the APU switch back ON to restart it.";
-                control = ControlId.None;
-                return "APU restarting.";
+                string advice = GetAdvice(order[i], out control);
+                if (advice != null) return advice;
             }
-            if (active[(int)FaultId.NavPlatform])
-            {
-                if (craft.Navigation.Enabled) return "Nav platform realigning. Guidance takes over again when it is aligned.";
-                control = ControlId.NavSystem;
-                return "The nav platform has dropped out. Press NAV SYSTEM to realign it.";
-            }
-            if (active[(int)FaultId.Antenna])
-            {
-                control = ControlId.CommAntenna;
-                if (craft.Comms.AntennaFaulted) return "The radio link is down. Set S-BAND XMIT OFF to reset the transmitter.";
-                if (!craft.Comms.AntennaEnabled) return "Set S-BAND XMIT back ON.";
-                control = craft.Comms.Enabled ? ControlId.None : ControlId.Comms;
-                return craft.Comms.Enabled ? "Transmitter reset. Reacquiring the signal." : "Press COMMS to bring the radio back.";
-            }
-            if (active[(int)FaultId.BatteryA])
-            {
-                control = ControlId.BatteryA;
-                return "Battery A is draining the bus. Set BATT A OFF to isolate it.";
-            }
-            if (active[(int)FaultId.WeakUpperEngine] && craft.Engine.IsBurning)
-                return "Engine thrust is low. Keep the throttle up and hold the burn: it will run longer than planned.";
+            control = ControlId.None;
             return null;
+        }
+
+        /// <summary>The next step of the procedure for one fault, or null when it is not active.</summary>
+        public string GetAdvice(FaultId id, out ControlId control)
+        {
+            control = ControlId.None;
+            if (!active[(int)id]) return null;
+
+            switch (id)
+            {
+                case FaultId.FuelPump:
+                    control = ControlId.FuelPump;
+                    if (!craft.Fuel.PumpsEnabled) return "Set FUEL PUMP back ON now.";
+                    if (craft.Fuel.PumpFaulted) return "Feed pressure is dropping. Set FUEL PUMP OFF and straight back ON to restart the pump.";
+                    control = ControlId.None;
+                    return "Fuel pump restarted. Feed pressure is recovering.";
+                case FaultId.OxygenRegulator:
+                    control = ControlId.CabinSystems;
+                    if (craft.LifeSupport.RegulatorFaulted) return "Oxygen is venting through a stuck regulator. Press CABIN SYS to shut the cabin loop down.";
+                    return "Regulator closed. Press CABIN SYS again to restart the cabin loop.";
+                case FaultId.ApuTrip:
+                    control = ControlId.Apu;
+                    if (craft.Power.ApuTripped) return "The APU has tripped. Set the APU switch OFF to reset it.";
+                    if (!craft.Power.ApuEnabled) return "Set the APU switch back ON to restart it.";
+                    control = ControlId.None;
+                    return "APU restarting.";
+                case FaultId.NavPlatform:
+                    if (craft.Navigation.Enabled) return "Nav platform realigning. Guidance takes over again when it is aligned.";
+                    control = ControlId.NavSystem;
+                    return "The nav platform has dropped out. Press NAV SYSTEM to realign it.";
+                case FaultId.Antenna:
+                    control = ControlId.CommAntenna;
+                    if (craft.Comms.AntennaFaulted) return "The radio link is down. Set S-BAND XMIT OFF to reset the transmitter.";
+                    if (!craft.Comms.AntennaEnabled) return "Set S-BAND XMIT back ON.";
+                    control = craft.Comms.Enabled ? ControlId.None : ControlId.Comms;
+                    return craft.Comms.Enabled ? "Transmitter reset. Reacquiring the signal." : "Press COMMS to bring the radio back.";
+                case FaultId.BatteryA:
+                    control = ControlId.BatteryA;
+                    return "Battery A is draining the bus. Set BATT A OFF to isolate it.";
+                case FaultId.WeakUpperEngine:
+                    if (craft.Engine.IsBurning)
+                        return "Engine thrust is low. Keep the throttle up and hold the burn: it will run longer than planned.";
+                    return null;
+                default:
+                    return null;
+            }
         }
     }
 }

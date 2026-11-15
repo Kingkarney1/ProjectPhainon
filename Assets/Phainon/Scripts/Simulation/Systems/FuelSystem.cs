@@ -2,6 +2,14 @@ using System;
 
 namespace Phainon.Simulation
 {
+    [Serializable]
+    public class FuelSnapshot
+    {
+        public bool pumps, tankPress, pumpFaulted;
+        public double feedPressure, holdUp;
+        public double[] propellantKg;
+    }
+
     /// <summary>Propellant quantity per stage and the pump/pressurisation state that feeds the engine.</summary>
     public class FuelSystem
     {
@@ -44,6 +52,38 @@ namespace Phainon.Simulation
         }
 
         public bool HasPropellant(int stage) { return IsValid(stage) && propellantKg[stage] > 0.0; }
+
+        /// <summary>Sets how full a stage's tanks are, 0..1.</summary>
+        public void SetFraction(int stage, double fraction)
+        {
+            if (IsValid(stage)) propellantKg[stage] = capacityKg[stage] * SimMath.Clamp01(fraction);
+        }
+
+        /// <summary>Adds propellant from a ground supply, up to the tank's capacity.</summary>
+        public void TopUp(int stage, double fraction)
+        {
+            if (IsValid(stage)) propellantKg[stage] = Math.Min(capacityKg[stage], propellantKg[stage] + capacityKg[stage] * fraction);
+        }
+
+        public FuelSnapshot Capture()
+        {
+            return new FuelSnapshot
+            {
+                pumps = PumpsEnabled, tankPress = TankPressEnabled, pumpFaulted = PumpFaulted,
+                feedPressure = FeedPressure, holdUp = holdUp, propellantKg = (double[])propellantKg.Clone()
+            };
+        }
+
+        public void Restore(FuelSnapshot s)
+        {
+            PumpsEnabled = s.pumps;
+            TankPressEnabled = s.tankPress;
+            PumpFaulted = s.pumpFaulted;
+            FeedPressure = s.feedPressure;
+            holdUp = s.holdUp;
+            if (s.propellantKg != null)
+                for (int i = 0; i < propellantKg.Length && i < s.propellantKg.Length; i++) propellantKg[i] = s.propellantKg[i];
+        }
 
         public void Tick(double dt, bool busPowered)
         {

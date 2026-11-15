@@ -91,6 +91,11 @@ namespace Phainon.EditorTools
                 sky.SetFloat("_HasEarthTex", 0f);
                 Debug.LogWarning("[Phainon] Earth day map not found at " + BuildPaths.EarthDayTexture + ". Using the procedural planet.");
             }
+            // Jupiter has a drawn fallback too, so a missing map costs the look and nothing else.
+            Texture2D jupiter = AssetFactory.PrepareJupiterTexture();
+            sky.SetTexture("_JupiterTex", jupiter);
+            sky.SetFloat("_HasJupiterTex", jupiter != null ? 1f : 0f);
+            if (jupiter == null) Debug.LogWarning("[Phainon] Jupiter map not found at " + BuildPaths.JupiterTexture + ". Using the drawn planet.");
             UnityEditor.EditorUtility.SetDirty(sky);
 
             // An inside-out sphere around the cabin. It is drawn first and writes no depth.

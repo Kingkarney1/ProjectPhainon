@@ -22,6 +22,9 @@ namespace Phainon.Environment
         private static readonly int WorldToInertialId = Shader.PropertyToID("_PhainonWorldToInertial");
         private static readonly int HazeColorId = Shader.PropertyToID("_PhainonHazeColorNow");
         private static readonly int SiteFadeId = Shader.PropertyToID("_PhainonSiteFade");
+        private static readonly int BodyRadiusId = Shader.PropertyToID("_PhainonBodyRadiusKm");
+        private static readonly int BodyId = Shader.PropertyToID("_PhainonBody");
+        private static readonly int FeatureLonId = Shader.PropertyToID("_PhainonFeatureLon");
 
         [SerializeField] internal SpacecraftController spacecraft;
         [SerializeField] internal EnvironmentConfig config;
@@ -93,20 +96,26 @@ namespace Phainon.Environment
             worldRoot.localRotation = levelToWorld;
 
             // Travelling downrange tips the local vertical forward relative to where it was at launch.
-            float downrangeDegrees = (float)(flight.DownrangeAngle * Mathf.Rad2Deg);
+            // Reduced to one turn in double precision: after many orbits the raw angle is too big for a float.
+            float downrangeDegrees = (float)(flight.DownrangeAngle * (180.0 / System.Math.PI) % 360.0);
             Quaternion levelToInertial = Quaternion.Euler(downrangeDegrees, 0f, 0f);
             Quaternion inertialToWorld = levelToWorld * Quaternion.Inverse(levelToInertial);
 
+            ScenarioSpec scenario = craft.Scenario;
+            bool away = scenario != null;
+            BodySpec body = flight.Body;
+
             Vector3 up = levelToWorld * Vector3.up;
-            Vector3 sunDirection = inertialToWorld * sunInertial;
+            Vector3 sunDirection = inertialToWorld * (away ? ScenarioSun(scenario) : sunInertial);
             Vector3 moonDirection = inertialToWorld * moonInertial;
 
             float altitudeKm = (float)(flight.AltitudeMeters / 1000.0);
-            Atmosphere = Mathf.Exp(-altitudeKm / Mathf.Max(0.1f, config.skyScaleHeightKm));
-            float stars = Mathf.InverseLerp(config.starsStartAltitudeKm, config.starsFullAltitudeKm, altitudeKm);
+            // A flight that starts in space has no air around it and no launch site below it.
+            Atmosphere = away ? 0f : Mathf.Exp(-altitudeKm / Mathf.Max(0.1f, config.skyScaleHeightKm));
+            float stars = away ? 1f : Mathf.InverseLerp(config.starsStartAltitudeKm, config.starsFullAltitudeKm, altitudeKm);
             // Sunlit unless the Sun is behind the Earth's disc. On the ground that disc is everything below
             // the horizon; from deep space it is a small circle, so the craft is almost never in shadow.
-            float earthSine = (float)(FlightModel.EarthRadius / flight.Radius);
+            float earthSine = (float)(body.radiusMeters / flight.Radius);
             float earthAngle = Mathf.Asin(Mathf.Clamp01(earthSine));
             float sunFromNadir = Vector3.Angle(sunDirection, -up) * Mathf.Deg2Rad;
             // Dusk is soft through air and sharp in vacuum.
@@ -121,47 +130,66 @@ namespace Phainon.Environment
             Shader.SetGlobalVector(SunDirId, sunDirection);
             Shader.SetGlobalVector(MoonDirId, moonDirection);
             // The cockpit sits on top of the stack, so on the pad the eye is already well above the ground.
-            Shader.SetGlobalFloat(AltitudeId, altitudeKm + config.stackHeight / 1000f);
+            Shader.SetGlobalFloat(AltitudeId, altitudeKm + (away ? 0f : config.stackHeight / 1000f));
+            Shader.SetGlobalFloat(BodyRadiusId, (float)(body.radiusMeters / 1000.0));
+            Shader.SetGlobalFloat(BodyId, body.name == "JUPITER" ? 1f : 0f);
+            Shader.SetGlobalFloat(FeatureLonId, (float)body.featureLongitudeDegrees * Mathf.Deg2Rad);
             Shader.SetGlobalFloat(AtmosphereId, Atmosphere);
             Shader.SetGlobalFloat(StarVisibilityId, stars);
             Shader.SetGlobalFloat(CloudTimeId, cloudTime);
             Shader.SetGlobalMatrix(WorldToInertialId, Matrix4x4.Rotate(Quaternion.Inverse(inertialToWorld)));
-            Shader.SetGlobalMatrix(WorldToEarthId, Matrix4x4.Rotate(levelToEarthAtLaunch * levelToInertial * shownAttitude));
+            // Body-fixed axes. Away from Earth the flight plane is the body's equator: its pole lies to the
+            // left of the track, and the body turns under the spacecraft by the simulation's own spin angle.
+            Quaternion inertialToBody = away
+                ? Quaternion.Euler(0f, (float)craft.BodySpinDegrees, 0f) * Quaternion.Euler(0f, 0f, -90f)
+                : levelToEarthAtLaunch;
+            Shader.SetGlobalMatrix(WorldToEarthId, Matrix4x4.Rotate(inertialToBody * levelToInertial * shownAttitude));
 
             Color haze = config.horizonColor * (0.05f + 0.95f * Daylight);
             Shader.SetGlobalColor(HazeColorId, haze);
 
-            UpdateSun(sunDirection);
-            UpdateAmbient(up, sunDirection);
-            UpdateLaunchSite(flight);
+            UpdateSun(sunDirection, away);
+            UpdateAmbient(up, sunDirection, away);
+            UpdateLaunchSite(flight, away);
             UpdateAirflow(flight);
         }
 
-        private void UpdateSun(Vector3 sunDirection)
+        /// <summary>The Sun as the mission places it: in the flight plane, lifted a little out of it.</summary>
+        private static Vector3 ScenarioSun(ScenarioSpec scenario)
+        {
+            float angle = (float)scenario.sunAngleDegrees * Mathf.Deg2Rad;
+            float lift = (float)scenario.sunElevationDegrees * Mathf.Deg2Rad;
+            // In the frame the flight starts in: +Y is up at the start, +Z is the way the vehicle travels.
+            return new Vector3(Mathf.Sin(lift), Mathf.Cos(lift) * Mathf.Cos(angle), Mathf.Cos(lift) * Mathf.Sin(angle));
+        }
+
+        private void UpdateSun(Vector3 sunDirection, bool away)
         {
             if (sun == null) return;
             sun.transform.rotation = Quaternion.LookRotation(-sunDirection);
             sun.color = config.sunColor;
             // The Sun is harsher in vacuum, and switches off once the Earth is in the way.
             float intensity = Mathf.Lerp(config.sunIntensitySpace, config.sunIntensityGround, Atmosphere);
-            sun.intensity = intensity * Daylight;
+            sun.intensity = intensity * Daylight * (away ? config.deepSpaceSunScale : 1f);
         }
 
-        private void UpdateAmbient(Vector3 up, Vector3 sunDirection)
+        private void UpdateAmbient(Vector3 up, Vector3 sunDirection, bool away)
         {
             Color sky = config.groundAmbient * (Atmosphere * Daylight);
-            Color space = config.spaceAmbient + config.earthshine * ((1f - Atmosphere) * earthshineNow);
+            Color space = config.spaceAmbient + (away ? config.jupiterShine : config.earthshine) * ((1f - Atmosphere) * earthshineNow);
             RenderSettings.ambientLight = sky + space;
         }
 
-        private void UpdateLaunchSite(FlightModel flight)
+        private void UpdateLaunchSite(FlightModel flight, bool away)
         {
             float altitude = (float)flight.AltitudeMeters;
-            float fade = 1f - Mathf.InverseLerp(config.siteFadeStartAltitude, config.siteFadeEndAltitude, altitude);
+            float fade = away ? 0f : 1f - Mathf.InverseLerp(config.siteFadeStartAltitude, config.siteFadeEndAltitude, altitude);
             Shader.SetGlobalFloat(SiteFadeId, fade);
 
             // In the level frame the ground drops straight down and slides behind as the vehicle heads downrange.
-            groundFrame.localPosition = new Vector3(0f, -altitude, -(float)flight.DownrangeMeters);
+            // Only while there is something there to see: beyond that the numbers are too large to place anything by.
+            if (fade > 0f || altitude < 200000f)
+                groundFrame.localPosition = new Vector3(0f, -altitude, -(float)flight.DownrangeMeters);
 
             if (launchSite == null) return;
             bool visible = fade > 0f;

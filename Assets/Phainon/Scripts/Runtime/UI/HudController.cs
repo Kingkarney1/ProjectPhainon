@@ -68,6 +68,15 @@ namespace Phainon.UI
             craft.CommandHandled += OnCommandHandled;
             router.CommandRejected += (id, message) => Push(message, theme.cautionAmber);
             spacecraft.TimeRateNotice += message => Push(message, theme.accentBlue);
+            spacecraft.SaveNotice += message => Push(message, theme.accentBlue);
+            craft.Science.ObservationCompleted += (record, observation) =>
+                Push("OBSERVATION COMPLETE - QUALITY " + record.quality.ToString("0"), theme.nominalGreen);
+            craft.Science.ObservationAbandoned += observation => Push("OBSERVATION LOST - TARGET OUT OF VIEW", theme.cautionAmber);
+            if (craft.Story != null)
+                craft.Story.Journal.EntryAdded += entry =>
+                {
+                    if (entry.category != (int)JournalCategory.MissionEvent) Push("NEW IN THE LOG - " + entry.title.ToUpperInvariant() + "   (J)", theme.accentBlue);
+                };
         }
 
         private void OnCommandHandled(ControlId id, CommandResult result)
@@ -105,7 +114,7 @@ namespace Phainon.UI
             if (!show) return;
 
             MissionController mission = craft.Mission;
-            string title = mission.Spec.GetPhaseInfo(mission.Phase).title;
+            string title = mission.PhaseTitle;
             int rate = spacecraft.TimeRate;
             if (title != lastTitle || rate != lastRate)
             {
@@ -113,7 +122,7 @@ namespace Phainon.UI
                 lastRate = rate;
                 phaseTitle.text = rate > 1 ? title + "   TIME x" + rate : title;
             }
-            phaseTitle.color = mission.IsFailed ? theme.warningRed : (mission.IsComplete ? theme.nominalGreen : theme.accentBlue);
+            phaseTitle.color = mission.IsFailed ? theme.warningRed : (mission.IsAccomplished ? theme.nominalGreen : theme.accentBlue);
             clockText.text = mission.FormatClock();
 
             string objective = mission.CurrentObjective;

@@ -51,6 +51,14 @@ namespace Phainon.Cockpit
                 control.ValueChanged += OnControlValueChanged;
                 control.SoundRequested += OnControlSound;
 
+                if (craft.Scenario != null)
+                {
+                    // The flight is already under way: the panel is set to match the spacecraft, not the other way round.
+                    double position = craft.GetControlValue(control.ControlId);
+                    if (!double.IsNaN(position)) control.SetWithoutNotify((float)position);
+                    continue;
+                }
+
                 // Bring the simulation into line with how the panel is physically set at start-up.
                 float initial = control.InitialValue;
                 if (initial >= 0f) craft.HandleControl(control.ControlId, initial);

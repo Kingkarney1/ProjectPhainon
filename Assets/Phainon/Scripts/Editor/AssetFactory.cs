@@ -25,6 +25,7 @@ namespace Phainon.EditorTools
         public InteractionSettings Interaction { get; private set; }
         public EnvironmentConfig Environment { get; private set; }
         public AudioLibrary Audio { get; private set; }
+        public StoryCampaign Story { get; private set; }
 
         // ---------------------------------------------------------------- shared art
 
@@ -71,6 +72,12 @@ namespace Phainon.EditorTools
             Systems.spec = new Phainon.Simulation.SystemsSpec();
             Mission.spec = new Phainon.Simulation.MissionSpec();
             GroundControl.spec = new Phainon.Simulation.CommsScriptSpec();
+            Story = LoadOrCreate<StoryCampaign>(BuildPaths.Data + "/StoryCampaign.asset");
+            Story.spec = Phainon.Simulation.StoryCampaignContent.Create();
+            EditorUtility.SetDirty(Story);
+            // The cabin is built with the window tilt the simulation sights its instruments along.
+            Environment.cabinTiltDegrees = (float)Vehicle.spec.windowTiltDegrees;
+            EditorUtility.SetDirty(Environment);
             EditorUtility.SetDirty(Vehicle);
             EditorUtility.SetDirty(Systems);
             EditorUtility.SetDirty(Mission);
@@ -433,9 +440,13 @@ namespace Phainon.EditorTools
         }
 
         /// <summary>Makes sure the Earth day map is imported with settings that suit a wrapped sphere map.</summary>
-        public static Texture2D PrepareEarthTexture()
+        public static Texture2D PrepareEarthTexture() { return PrepareBodyTexture(BuildPaths.EarthDayTexture); }
+        public static Texture2D PrepareJupiterTexture() { return PrepareBodyTexture(BuildPaths.JupiterTexture); }
+
+        /// <summary>Sets up an equirectangular map of a planet: wraps round in longitude, clamps at the poles.</summary>
+        private static Texture2D PrepareBodyTexture(string path)
         {
-            var importer = AssetImporter.GetAtPath(BuildPaths.EarthDayTexture) as TextureImporter;
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
             if (importer == null) return null;
             if (importer.wrapModeU != TextureWrapMode.Repeat || importer.wrapModeV != TextureWrapMode.Clamp || importer.maxTextureSize < 2048)
             {
@@ -448,7 +459,7 @@ namespace Phainon.EditorTools
                 importer.anisoLevel = 4;
                 importer.SaveAndReimport();
             }
-            return AssetDatabase.LoadAssetAtPath<Texture2D>(BuildPaths.EarthDayTexture);
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
     }
 }

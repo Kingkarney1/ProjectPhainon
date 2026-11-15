@@ -61,7 +61,11 @@ loop rumble_loop   6 1.0 "anoisesrc=c=brown:r=44100:a=1.0:seed=24,lowpass=f=110,
 loop wind_loop     6 1.0 "anoisesrc=c=pink:r=44100:a=0.7:seed=25,bandpass=f=900:t=h:w=1400,volume=2.2,tremolo=f=0.7:d=0.4"
 loop rcs_loop      2 0.4 "anoisesrc=c=white:r=44100:a=0.5:seed=26,highpass=f=1800,lowpass=f=9000"
 
+loop radio_static_loop 4 0.6 "anoisesrc=c=white:r=44100:a=0.5:seed=27,bandpass=f=2400:t=h:w=2600,tremolo=f=0.4:d=0.3"
+
 # Periodic loops made of whole cycles need no cross-fade.
+# One slow breath in and out every four seconds, heard from inside a helmet.
+shot breathing_loop "aevalsrc='0.9*(random(0)-0.5)*(pow(sin(PI*t/1.6)\,2)*lt(t\,1.6)+0.8*pow(sin(PI*(t-2)/1.8)\,2)*gt(t\,2)*lt(t\,3.8))':d=4:s=44100,lowpass=f=1100,highpass=f=180"
 shot electrical_hum "aevalsrc='0.20*sin(2*PI*400*t)+0.07*sin(2*PI*800*t)+0.04*sin(2*PI*1200*t)+0.10*sin(2*PI*120*t)':d=4:s=44100"
 shot master_alarm   "aevalsrc='0.42*(sin(2*PI*940*t)+0.35*sin(2*PI*1880*t))*lt(mod(t\,0.5)\,0.24)*min(1\,mod(t\,0.5)*200)*min(1\,(0.24-mod(t\,0.5))*200)':d=1:s=44100"
 

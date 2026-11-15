@@ -2,6 +2,13 @@ using System;
 
 namespace Phainon.Simulation
 {
+    [Serializable]
+    public class CommsSnapshot
+    {
+        public bool enabled, antenna, antennaFaulted;
+        public double acquisition, signal, clock;
+    }
+
     /// <summary>Radio link to mission control: transceiver power, antenna transmit switch and link acquisition.</summary>
     public class CommsSystem
     {
@@ -35,6 +42,26 @@ namespace Phainon.Simulation
             return CommandResult.Ok(AntennaEnabled ? "COMMS ON - ACQUIRING SIGNAL" : "COMMS ON - S-BAND XMIT IS OFF");
         }
 
+        public CommsSnapshot Capture()
+        {
+            return new CommsSnapshot
+            {
+                enabled = Enabled, antenna = AntennaEnabled, antennaFaulted = AntennaFaulted,
+                acquisition = AcquisitionProgress, signal = SignalStrength, clock = clock
+            };
+        }
+
+        public void Restore(CommsSnapshot s)
+        {
+            Enabled = s.enabled;
+            AntennaEnabled = s.antenna;
+            AntennaFaulted = s.antennaFaulted;
+            AcquisitionProgress = s.acquisition;
+            SignalStrength = s.signal;
+            clock = s.clock;
+        }
+
+        /// <param name="altitudeMeters">Length of the signal path to the ground station.</param>
         public void Tick(double dt, bool busPowered, double altitudeMeters, double dynamicPressurePa)
         {
             clock += dt;

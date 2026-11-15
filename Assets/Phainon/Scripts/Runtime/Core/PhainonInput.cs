@@ -28,6 +28,8 @@ namespace Phainon
         public readonly InputAction ToggleCommsLog;
         public readonly InputAction TimeFaster;
         public readonly InputAction TimeSlower;
+        public readonly InputAction ToggleJournal;
+        public readonly InputAction Skip;
 
         private readonly InputActionMap map = new InputActionMap("Cockpit");
 
@@ -67,6 +69,9 @@ namespace Phainon
             ToggleCommsLog = map.AddAction("ToggleCommsLog", InputActionType.Button, "<Keyboard>/c");
             TimeFaster = map.AddAction("TimeFaster", InputActionType.Button, "<Keyboard>/period");
             TimeSlower = map.AddAction("TimeSlower", InputActionType.Button, "<Keyboard>/comma");
+            ToggleJournal = map.AddAction("ToggleJournal", InputActionType.Button, "<Keyboard>/j");
+            Skip = map.AddAction("Skip", InputActionType.Button, "<Keyboard>/space");
+            Skip.AddBinding("<Keyboard>/enter");
         }
 
         public void Enable() { map.Enable(); }

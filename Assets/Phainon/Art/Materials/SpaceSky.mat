@@ -28,10 +28,15 @@ Material:
         m_Texture: {fileID: 2800000, guid: be7b1279f7c7f96329a1f0c025d73ab7, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _JupiterTex:
+        m_Texture: {fileID: 2800000, guid: b8c9143918a42aef48f8dc0f7e4b6d4e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _CloudCoverage: 0.52
     - _HasEarthTex: 1
+    - _HasJupiterTex: 1
     - _StarBrightness: 1.4
     - _SunIntensity: 30
     m_Colors:

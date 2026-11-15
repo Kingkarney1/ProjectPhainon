@@ -14,7 +14,8 @@ The 0.1.0 builds are an untested pre-release: they were made before the launch-e
 
 Read this first.
 
-- All C# compiles cleanly against Unity 6000.6.9f1's own assemblies, and the simulation test suite (35 tests, including pad-to-orbit flights with every fault and a coast to a million kilometres) passes. Both checks run outside the editor with `Tools/verify_without_unity.sh`.
+- All C# compiles cleanly against Unity 6000.6.9f1's own assemblies, and the simulation test suite (55 tests, including pad-to-orbit flights with every fault, a coast to a million kilometres and the whole of story Mission 01) passes. Both checks run outside the editor with `Tools/verify_without_unity.sh`.
+- **Story Mode (added 2026-11-15) has not been run in the editor at all.** Its simulation is tested end to end, and its Unity layer (menu, introduction, wake-up, Jupiter in the sky shader, log, save file, the four new panel controls) type-checks, but nobody has yet seen it on screen. Expect layout and look to need a pass.
 - Played in the Unity editor on 2026-11-14 from power-up through staging to orbital insertion, with a clean Console.
 - The Ground Control radio was seen working in the editor on 2026-11-14.
 - Faults, the departure from Earth orbit, time acceleration and the long-distance sky are written, tested as simulation and type-checked, but **have not yet been confirmed by eye in the editor**. The same goes for the launch effects (plumes, pad cloud, vapour, ascent trail, chase camera).
@@ -52,6 +53,23 @@ From a terminal that is outside any sandbox, with Unity Hub running and signed i
 ~/Unity/Hub/Editor/6000.6.9f1/Editor/Unity -batchmode -quit -projectPath . -executeMethod Phainon.EditorTools.ProjectBuilder.BuildWindowsPlayer -logFile -
 ```
 
+## Story Mode
+
+**New Story** on the main menu starts Operation Phainon's campaign. Mission 01: you wake in the seat, on batteries, with alarms going and Jupiter filling the window. Nothing tells you why you are there.
+
+1. Silence the alarm, then bring the spacecraft back: APU, cabin loop, nav platform, radio. The guide gives each step.
+2. Press `J` and read what the mission computer recovered.
+3. NAV MODE to RETRO, FUEL PUMP and TANK PRESS on, GUIDANCE and RCS on. The left display shows time to periapsis and the delta-v needed to stay.
+4. Coast in (`.` speeds time up), light the engine half a burn before periapsis, and cut it when ORBIT GO lights. Miss the burn and Jupiter is gone for good.
+5. SCIENCE PWR on. Choose with INSTRUMENT, aim the window at Jupiter (GUIDANCE off, RCS on, `W` `S`), press OBSERVE. Three observations are needed; range, pointing, sunlight and instrument health decide the data quality.
+6. Press TRANSMIT to send them home.
+
+Earth is 43 light-minutes away, so Ground Control answers an hour and a half after you speak, and warns you about things you have already dealt with. With nothing waiting for a reply, `7` `8` `9` offer calls you can make.
+
+The story saves by itself after each objective, and from the pause menu, to one file under the game's data folder (`Story/save.json`). It will not save while the engine is running or an observation is recording. **Continue Story** picks it up; **New Story** replaces it after asking.
+
+Everything the mission says and every number it uses is in `Scripts/Simulation/Story/Content/Mission01Jupiter.cs`. A new mission is another file like it and one line in `StoryCampaignContent.cs`.
+
 ## Controls
 
 | Action | Input |
@@ -67,12 +85,17 @@ From a terminal that is outside any sandbox, with Unity Hub running and signed i
 | Toggle the objective guide | `H` |
 | Answer Ground Control | `7` `8` `9` pick the numbered reply |
 | Radio log | `C` |
+| Call Ground Control (story, nothing awaiting a reply) | `7` `8` `9` |
+| Log (story) | `J` |
+| Skip the introduction or the wake-up | `Space` |
 | Time rate (in orbit or beyond, engine off) | `.` faster, `,` slower: x1, x10, x100, x1000, x10000 |
 | Pause | `Esc` or `P` |
 
 The control you need next pulses amber, and the current objective is shown at the top left. Ground Control speaks on the radio panel at the top right once COMMS and S-BAND XMIT are on. One seeded fault happens each flight (APU trip, fuel pump, battery, nav platform, transmitter or a weak upper engine); the repair is the affected system's own switch, and the Console logs the seed so a flight can be repeated.
 
 ## Flying the mission
+
+This is the Earth Launch Mission on the main menu.
 
 1. **Pre-launch.** On the overhead panel: BATT A, BATT B and APU on. Press MAIN POWER. Then FUEL PUMP, TANK PRESS, NAV SYSTEM, NAV MODE to ASCENT, GUIDANCE, S-BAND XMIT, COMMS, CABIN SYS. The centre display shows a GO / NO-GO board. When every row is GO, press LAUNCH SEQ.
 2. **Ignition.** Set full throttle. At T-6 lift the guard and press ENGINE IGNITION. The clamps release at T-0 if thrust is high enough; the countdown holds if any system drops out.
@@ -144,10 +167,12 @@ Runs the simulation tests on the editor's bundled Mono and type-checks every ass
 - Ground Control is text only (no voice), covers the one mission, and its story flags are not saved between sessions.
 - Faults: one per flight, each fixed by a single switch procedure. There is no wear model, no difficulty setting and no multi-step repair.
 - Beyond orbit: Earth is the only body with gravity, there is no retrograde hold or RCS translation (nothing yet to brake for or dock with), and time acceleration is limited near Earth.
-- One window size and one quality level have been considered. There is no settings menu, key rebinding or gamepad support.
+- One window size and one quality level have been considered. Settings are a master volume and a reduced-effects switch; there is no key rebinding or gamepad support.
+- Story Mode: one mission and one save file. Jupiter is the only body with gravity there; its moons are not drawn. The orbit is flat (no inclination), so none is shown. Food, water and crew condition are not modelled. Three of the six instruments in the design exist.
 
 ## Credits
 
 - `Assets/Phainon/Art/Textures/EarthDay.jpg`: NASA Blue Marble "Land, Ocean, Ice" composite, public domain (see `CREDITS.txt` beside it).
+- `Assets/Phainon/Art/Textures/JupiterMap.jpg`: Cassini map of Jupiter, PIA07782, NASA/JPL/Space Science Institute, public domain.
 - TextMesh Pro essential resources and the Liberation Sans font ship with Unity.
 - Everything else is generated by this project's code.
