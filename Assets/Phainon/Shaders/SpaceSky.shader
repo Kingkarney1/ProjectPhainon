@@ -1,6 +1,7 @@
 // The whole view outside the spacecraft in one pass: sky, atmosphere, Earth, stars, Sun and Moon.
 //
-// It is drawn on a large inside-out sphere before everything else. The Earth is not a mesh: each
+// It is drawn on a large inside-out sphere at the far plane, after the cabin, so the pixels the
+// cabin covers are never shaded. The Earth is not a mesh: each
 // pixel intersects its view ray with a sphere of Earth's radius, which gives a perfectly smooth
 // limb and the correct curvature at any altitude, from the launch pad to orbit. The script
 // EnvironmentDirector feeds it the spacecraft's altitude and orientation through global properties.
@@ -23,7 +24,7 @@ Shader "Phainon/SpaceSky"
 
     SubShader
     {
-        Tags { "RenderPipeline" = "UniversalPipeline" "Queue" = "Background" "RenderType" = "Background" "IgnoreProjector" = "True" }
+        Tags { "RenderPipeline" = "UniversalPipeline" "Queue" = "Geometry+400" "RenderType" = "Background" "IgnoreProjector" = "True" }
 
         Pass
         {
@@ -96,6 +97,12 @@ Shader "Phainon/SpaceSky"
                 Varyings output;
                 VertexPositionInputs vertex = GetVertexPositionInputs(input.positionOS.xyz);
                 output.positionCS = vertex.positionCS;
+                // Pushed to the far plane (a hair inside it), so the depth test hides the sky behind everything solid.
+                #if UNITY_REVERSED_Z
+                    output.positionCS.z = output.positionCS.w * 1.0e-6;
+                #else
+                    output.positionCS.z = output.positionCS.w * 0.999999;
+                #endif
                 output.viewDirWS = vertex.positionWS - GetCameraPositionWS();
                 return output;
             }
@@ -133,16 +140,37 @@ Shader "Phainon/SpaceSky"
                 return step(0.9, dot(dir, centre)) * (exp(-r2) * 0.5 + exp(-r2 * 7.0) * 0.7);
             }
 
-            // Faint nebulae and two small galaxies, fixed among the stars.
+            // Nebulae, a faint haze of dust and four small galaxies, fixed among the stars. The clouds take
+            // their shapes from warped noise, so none is round and none repeats; broad lobes only decide
+            // which colour lives in which part of the sky.
             float3 DeepSky(float3 dir)
             {
-                float mottle = 0.25 + 0.75 * Fbm3(dir * 9.0 + 4.0);
-                float3 color = float3(0.55, 0.16, 0.26) * pow(saturate(dot(dir, normalize(float3(-0.62, 0.31, 0.72)))), 60.0);
-                color += float3(0.14, 0.30, 0.55) * pow(saturate(dot(dir, normalize(float3(0.48, -0.55, -0.68)))), 90.0);
-                color += float3(0.30, 0.20, 0.50) * pow(saturate(dot(dir, normalize(float3(0.10, 0.80, -0.59)))), 140.0);
-                color *= mottle * 0.16;
-                color += float3(0.90, 0.85, 0.70) * Galaxy(dir, normalize(float3(0.74, 0.42, -0.52)), float3(0.2, 0.9, 0.1), 0.035, 0.012) * 0.12;
-                color += float3(0.70, 0.80, 1.00) * Galaxy(dir, normalize(float3(-0.30, -0.72, 0.62)), float3(0.9, 0.1, 0.4), 0.022, 0.009) * 0.12;
+                float3 warp = float3(ValueNoise3(dir * 3.1 + 11.0), ValueNoise3(dir * 3.1 + 23.0), ValueNoise3(dir * 3.1 + 37.0)) - 0.5;
+                float form = Fbm3(dir * 2.6 + warp * 1.6 + 4.0);
+                float filaments = Fbm3(dir * 8.5 + warp * 3.0 + 9.0);
+                float cloud = smoothstep(0.48, 0.82, form) * (0.30 + 0.70 * filaments);
+                // The densest parts glow: the luminous hearts of the clouds.
+                cloud *= 1.0 + 2.0 * smoothstep(0.70, 0.90, form);
+
+                float pink = saturate(dot(dir, normalize(float3(-0.62, 0.31, 0.72))));
+                float blue = saturate(dot(dir, normalize(float3(0.48, -0.55, -0.68))));
+                float purple = saturate(dot(dir, normalize(float3(0.10, 0.80, -0.59))));
+                float red = saturate(dot(dir, normalize(float3(-0.70, -0.60, -0.38))));
+                // Raised to a power by multiplying: each lobe fades out some thirty to forty degrees from its centre.
+                pink *= pink; pink *= pink * pink;
+                blue *= blue; blue *= blue * blue;
+                purple *= purple; purple *= purple; purple *= purple;
+                red *= red; red *= red; red *= red;
+                float3 color = (float3(0.85, 0.28, 0.42) * pink + float3(0.20, 0.42, 0.90) * blue
+                              + float3(0.48, 0.26, 0.80) * purple + float3(0.60, 0.12, 0.10) * red) * (cloud * 0.25);
+
+                // Dust between the stars: a blue haze so faint it only keeps the black from being flat.
+                color += float3(0.004, 0.006, 0.014) * (0.4 + 1.2 * form);
+
+                color += float3(0.90, 0.85, 0.70) * Galaxy(dir, normalize(float3(0.74, 0.42, -0.52)), float3(0.2, 0.9, 0.1), 0.035, 0.012) * 0.20;
+                color += float3(0.70, 0.80, 1.00) * Galaxy(dir, normalize(float3(-0.30, -0.72, 0.62)), float3(0.9, 0.1, 0.4), 0.022, 0.009) * 0.20;
+                color += float3(0.95, 0.80, 0.65) * Galaxy(dir, normalize(float3(-0.55, 0.62, -0.56)), float3(0.3, 0.2, 0.9), 0.016, 0.011) * 0.16;
+                color += float3(0.75, 0.82, 1.00) * Galaxy(dir, normalize(float3(0.20, -0.25, 0.95)), float3(0.7, 0.7, 0.0), 0.026, 0.006) * 0.16;
                 return color;
             }
 
@@ -174,32 +202,44 @@ Shader "Phainon/SpaceSky"
                 crowd = band * (0.35 + 0.65 * clouds);
                 float glow = (band * clouds * lerp(0.45, 1.0, 0.5 + 0.5 * towardsCentre) + bulge * 0.6) * (1.0 - 0.8 * rift);
                 float3 tint = lerp(float3(0.60, 0.70, 0.95), float3(1.0, 0.86, 0.66), saturate(inner * 0.7 + bulge));
+                // Glowing gas along the band: small pink knots where the finest clouds are thickest.
+                float3 knots = float3(0.90, 0.32, 0.44) * (smoothstep(0.66, 0.84, fine) * band * clouds * 0.03);
                 // Kept faint: it is a glow behind the stars, not a cloud in front of them.
-                return tint * (glow * 0.045);
+                return tint * (glow * 0.075) + knots;
             }
 
-            float3 Stars(float3 dir, float crowd)
+            // "pixel" is how much of the sky one pixel covers. No star is drawn smaller than that, so the
+            // faint ones stay visible and none flickers as the view turns.
+            float3 Stars(float3 dir, float crowd, float pixel)
             {
                 float3 color = 0.0;
-                for (int layer = 0; layer < 3; layer++)
+                for (int layer = 0; layer < 4; layer++)
                 {
-                    float scale = layer == 0 ? 85.0 : (layer == 1 ? 170.0 : 250.0);
-                    // The third layer is faint and thickens along the Milky Way.
-                    float threshold = layer == 0 ? 0.93 : (layer == 1 ? 0.955 : lerp(0.975, 0.86, crowd));
+                    // Layer 0: the hundred or so bright stars. 1 and 2: the field. 3: faint stars that crowd along the Milky Way.
+                    float scale = layer == 0 ? 42.0 : (layer == 1 ? 95.0 : (layer == 2 ? 180.0 : 290.0));
+                    float threshold = layer == 0 ? 0.965 : (layer == 1 ? 0.92 : (layer == 2 ? 0.94 : lerp(0.965, 0.75, crowd)));
                     float3 p = dir * scale;
                     float3 cell = floor(p);
                     float3 local = frac(p) - 0.5;
                     float3 rnd = Hash33(cell);
+                    float3 rnd2 = Hash33(cell + 7.0);
 
                     float present = step(threshold, rnd.x);
-                    float3 offset = (Hash33(cell + 7.0) - 0.5) * 0.55;
-                    float size = lerp(0.07, 0.15, rnd.y * rnd.y);
+                    float3 offset = (rnd2 - 0.5) * 0.55;
+                    // Kept inside its cell (0.22 at most), or the cell's edge would cut it.
+                    float size = min(max(lerp(0.05, 0.12, rnd.y * rnd.y), pixel * scale * 1.2), 0.22);
                     float falloff = smoothstep(size, 0.0, length(local - offset));
+                    falloff *= falloff;
                     // A wide spread: most stars faint, a few bright.
-                    float brightness = lerp(0.14, 2.6, pow(rnd.z, 7.0)) * (layer == 2 ? 0.3 : 1.0);
-                    // Stars only twinkle through air. In vacuum this term is exactly one.
-                    brightness *= 1.0 + _PhainonAtmosphere * 0.35 * sin(_Time.y * (2.0 + 5.0 * rnd.x) + rnd.y * 40.0);
-                    float3 tint = lerp(float3(0.72, 0.84, 1.0), float3(1.0, 0.90, 0.74), rnd.y);
+                    float spread = rnd.z * rnd.z; spread *= spread * rnd.z;
+                    float brightness = layer == 0 ? lerp(1.2, 4.0, spread) : lerp(0.32, 2.4, spread) * (layer == 3 ? 0.45 : 1.0);
+                    // One star in five shimmers a little; through air they all do, and more.
+                    float shimmer = 0.10 * step(0.8, frac(rnd.z * 37.0)) + 0.35 * _PhainonAtmosphere;
+                    brightness *= 1.0 + shimmer * sin(_Time.y * (1.5 + 4.0 * rnd2.z) + rnd.y * 40.0);
+                    // Blue-white through white to warm yellow, with the occasional orange giant.
+                    float hue = frac(rnd.x * 53.0 + rnd2.y);
+                    float3 tint = hue < 0.5 ? lerp(float3(0.66, 0.80, 1.0), float3(1.0, 1.0, 1.0), hue * 2.0)
+                                            : lerp(float3(1.0, 1.0, 1.0), float3(1.0, 0.76, 0.50), (hue - 0.5) * 2.0);
                     color += falloff * brightness * tint * present;
                 }
                 return color;
@@ -366,7 +406,7 @@ Shader "Phainon/SpaceSky"
                 return albedo * (lit * limb * 1.2 + 0.003) + float3(0.95, 0.86, 0.72) * (haze * 0.22);
             }
 
-            float3 ShadeSky(float3 viewDir, float3 up, float3 sun, float camRadius, float above, float altitudeKm)
+            float3 ShadeSky(float3 viewDir, float3 up, float3 sun, float camRadius, float above, float altitudeKm, float pixel)
             {
                 float atmosphere = _PhainonAtmosphere;
                 float daylight = smoothstep(-0.22, 0.18, dot(up, sun));
@@ -443,7 +483,7 @@ Shader "Phainon/SpaceSky"
                 float3 inertialDir = normalize(mul(RotationOrIdentity(_PhainonWorldToInertial), viewDir));
                 float crowd;
                 float3 milkyWay = MilkyWay(inertialDir, crowd);
-                float3 starField = Stars(inertialDir, crowd) + milkyWay + DeepSky(inertialDir);
+                float3 starField = Stars(inertialDir, crowd, pixel) + milkyWay + DeepSky(inertialDir);
                 color += starField * (_StarBrightness * _PhainonStarVisibility * darkness);
                 return color;
             }
@@ -451,6 +491,8 @@ Shader "Phainon/SpaceSky"
             half4 Frag(Varyings input) : SV_Target
             {
                 float3 viewDir = normalize(input.viewDirWS);
+                // Taken here, before any branch: screen-space differences are not allowed inside one.
+                float pixel = length(fwidth(viewDir));
                 float3 up = DirectionOr(_PhainonUpDir, float3(0.0, 1.0, 0.0));
                 float3 sun = DirectionOr(_PhainonSunDir, float3(0.5, 0.7, 0.5));
 
@@ -471,13 +513,13 @@ Shader "Phainon/SpaceSky"
                     else color = ShadeEarth(viewDir, up, sun, camRadius, altitudeKm, cosNadir, sinNadir);
 
                     // Blend the last sliver of surface into the atmosphere so the limb has no hard edge.
-                    float3 skyAtLimb = ShadeSky(viewDir, up, sun, camRadius, 0.0, altitudeKm);
+                    float3 skyAtLimb = ShadeSky(viewDir, up, sun, camRadius, 0.0, altitudeKm, pixel);
                     float tangentDistance = sqrt(max(camRadius * camRadius - EARTH_RADIUS_KM * EARTH_RADIUS_KM, 0.0));
                     color = lerp(color, max(color, skyAtLimb * 0.85), smoothstep(-0.006 * LimbScale(tangentDistance), 0.0, above));
                 }
                 else
                 {
-                    color = ShadeSky(viewDir, up, sun, camRadius, above, altitudeKm);
+                    color = ShadeSky(viewDir, up, sun, camRadius, above, altitudeKm, pixel);
                 }
 
                 return half4(color, 1.0);

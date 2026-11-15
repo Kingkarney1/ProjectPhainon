@@ -87,6 +87,9 @@ namespace Phainon.EditorTools
             fabric = assets.Lit("SeatFabric", new Color(0.075f, 0.085f, 0.11f), 0.0f, 0.12f, assets.Upholstery, 3.5f, false, 0.4f);
             fixture = assets.Emissive("LightFixture", new Color(0.9f, 0.9f, 0.86f), new Color(1.6f, 1.5f, 1.3f));
             glass = assets.Custom("WindowGlass", "Phainon/WindowGlass");
+            // The pane's own reflection is kept dim: a bright one lays a blue veil over the stars.
+            glass.SetColor("_Tint", new Color(0.10f, 0.13f, 0.17f));
+            glass.SetFloat("_GrazingOpacity", 0.22f);
             marking = assets.Emissive("PanelMarking", new Color(0.8f, 0.82f, 0.84f), new Color(0.16f, 0.17f, 0.18f));
             hazard = assets.Lit("HazardAmber", new Color(0.85f, 0.55f, 0.04f), 0.0f, 0.35f);
         }
@@ -410,6 +413,8 @@ namespace Phainon.EditorTools
         private void BuildLeftConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
+            // A post from the floor into the console body. Placed where a port-side column clears the cabin model (checked against the mesh).
+            SceneKit.Box("Console Post (Left)", Root, new Vector3(-SideConsole.x + 0.04f, 0.22f, SideConsole.z + 0.04f), new Vector3(0.12f, 0.44f, 0.12f), structure, false, new Vector3(0f, -25f, 0f));
             Transform p = Panel("Propulsion Console (Left)", new Vector3(-SideConsole.x, SideConsole.y, SideConsole.z), new Vector3(70f, -25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("PROPULSION", p, new Vector2(0f, 0.268f), 8f, false);
             Controls.AddLabel("PNL 2", p, new Vector2(-0.155f, -0.276f), 5f, false);
@@ -424,6 +429,8 @@ namespace Phainon.EditorTools
         private void BuildRightConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
+            // A post from the floor into the console body. Placed where a starboard-side column clears the cabin model (checked against the mesh).
+            SceneKit.Box("Console Post (Right)", Root, new Vector3(SideConsole.x - 0.04f, 0.22f, SideConsole.z + 0.04f), new Vector3(0.12f, 0.44f, 0.12f), structure, false, new Vector3(0f, 25f, 0f));
             Transform p = Panel("Flight Control Console (Right)", new Vector3(SideConsole.x, SideConsole.y, SideConsole.z), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("FLIGHT CONTROL", p, new Vector2(0f, 0.268f), 8f, false);
             Controls.AddLabel("PNL 3", p, new Vector2(-0.155f, -0.276f), 5f, false);

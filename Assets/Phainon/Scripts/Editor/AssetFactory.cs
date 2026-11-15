@@ -51,6 +51,8 @@ namespace Phainon.EditorTools
             public Color mean = Color.white;
             /// <summary>For a photo-scanned set: the real width one tile of the scan covers, in metres.</summary>
             public float metres = 1f;
+            /// <summary>For a photo-scanned set: how much of the scan's own shine and relief is kept (1 = all of it).</summary>
+            public float shine = 1f, relief = 1f;
         }
 
         /// <summary>Fine moulded grain for powder-coated panels and plastic caps, with a few handling scratches.</summary>
@@ -161,12 +163,13 @@ namespace Phainon.EditorTools
             // The last number is the real width of one tile, which keeps every finish at its true scale.
             Surface generatedGrain = Grain;
             Paint = ScannedSurface("PaintedPanel", 4096, 0.6f) ?? Paint;
-            Grain = ScannedSurface("PowderCoat", 4096, 0.25f) ?? Grain;
+            // The panel coat's scan is of textured metal: laid small, dulled and flattened, and not as a metal, it reads as a matt coat that labels stay legible on.
+            Grain = ScannedSurface("PowderCoat", 4096, 0.09f, 0.55f, 0.45f, false) ?? Grain;
             Brushed = ScannedSurface("BrushedAluminium", 2048, 0.4f) ?? Brushed;
             Anodised = ScannedSurface("AnodisedAluminium", 2048, 0.4f) ?? Anodised;
             Weave = ScannedSurface("CarbonComposite", 2048, 0.08f) ?? Weave;
             Rubber = ScannedSurface("Rubber", 1024, 0.75f) ?? Knurl;
-            Plastic = ScannedSurface("MouldedPlastic", 1024, 0.3f) ?? generatedGrain;
+            Plastic = ScannedSurface("MouldedPlastic", 1024, 0.3f, 0.6f) ?? generatedGrain;
             Upholstery = ScannedSurface("SeatLeather", 1024, 0.35f) ?? Quilt;
 
             ExternalCameraTexture = LoadOrCreateRenderTexture(BuildPaths.Textures + "/ExternalCameraFeed.renderTexture");
@@ -224,11 +227,11 @@ namespace Phainon.EditorTools
                 // A scan is laid at its real size and keeps its own relief and shine; the tiling, bump and
                 // smoothness asked for apply to a generated finish.
                 material.SetTextureScale("_BaseMap", Vector2.one * (scanned ? 1f / surface.metres : tilesPerMetre));
-                if (scanned) material.SetFloat("_Smoothness", 1f);
+                if (scanned) material.SetFloat("_Smoothness", surface.shine);
                 if (surface.normal != null)
                 {
                     material.SetTexture("_BumpMap", surface.normal);
-                    material.SetFloat("_BumpScale", scanned ? 1f : bump);
+                    material.SetFloat("_BumpScale", scanned ? surface.relief : bump);
                     material.EnableKeyword("_NORMALMAP");
                 }
             }
@@ -491,7 +494,7 @@ namespace Phainon.EditorTools
         /// metalness, occlusion and height where the scan has them. Returns null if the set is not in
         /// the project, so the caller can fall back to a generated finish.
         /// </summary>
-        private static Surface ScannedSurface(string name, int maxSize, float metres)
+        private static Surface ScannedSurface(string name, int maxSize, float metres, float shine = 1f, float relief = 1f, bool metal = true)
         {
             string folder = BuildPaths.CockpitTextures + "/" + name;
             string colour = folder + "/Color.jpg", normal = folder + "/Normal.jpg", roughness = folder + "/Roughness.jpg";
@@ -508,10 +511,10 @@ namespace Phainon.EditorTools
             if (!File.Exists(mask) || File.GetLastWriteTimeUtc(mask) < File.GetLastWriteTimeUtc(roughness))
             {
                 int size = maxSize / 2;
-                Color32[] rough = LoadRaw(roughness, size), metal = LoadRaw(metalness, size), shade = LoadRaw(occlusion, size);
+                Color32[] rough = LoadRaw(roughness, size), metalMap = metal ? LoadRaw(metalness, size) : null, shade = LoadRaw(occlusion, size);
                 var pixels = new Color32[size * size];
                 for (int i = 0; i < pixels.Length; i++)
-                    pixels[i] = new Color32(metal != null ? metal[i].r : (byte)0, shade != null ? shade[i].r : (byte)255, 0, (byte)(255 - rough[i].r));
+                    pixels[i] = new Color32(metalMap != null ? metalMap[i].r : (byte)0, shade != null ? shade[i].r : (byte)255, 0, (byte)(255 - rough[i].r));
                 var packed = new Texture2D(size, size, TextureFormat.RGBA32, false, true);
                 packed.SetPixels32(pixels);
                 File.WriteAllBytes(mask, packed.EncodeToPNG());
@@ -541,7 +544,7 @@ namespace Phainon.EditorTools
                 mask = AssetDatabase.LoadAssetAtPath<Texture2D>(mask),
                 height = File.Exists(height) ? AssetDatabase.LoadAssetAtPath<Texture2D>(height) : null,
                 mean = mean,
-                metres = metres
+                metres = metres, shine = shine, relief = relief
             };
         }
 

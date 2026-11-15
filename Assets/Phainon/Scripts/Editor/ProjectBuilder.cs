@@ -23,7 +23,7 @@ namespace Phainon.EditorTools
         /// Raise this whenever the builders change what they generate. An open editor then rebuilds
         /// the scene by itself, so the scene on disk can never lag behind the code that makes it.
         /// </summary>
-        public const int BuildVersion = 15;
+        public const int BuildVersion = 18;
         private const string StampPath = "Library/PhainonBuildVersion.txt";
 
         public static bool SceneIsCurrent

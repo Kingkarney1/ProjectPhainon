@@ -345,6 +345,24 @@ namespace Phainon.EditorTools
                 Capture(camera, turnedNames[i]);
             }
 
+            // The sky by itself, from outside the cabin, towards each nebula and the galactic centre. The
+            // directions are the ones the sky shader gives them among the stars.
+            Vector3[] among = { new Vector3(-0.62f, 0.31f, 0.72f), new Vector3(0.48f, -0.55f, -0.68f), new Vector3(0.10f, 0.80f, -0.59f),
+                                new Vector3(-0.70f, -0.60f, -0.38f), new Vector3(0.86f, -0.35f, 0f) };
+            string[] amongNames = { "21_Sky_pink_nebula", "22_Sky_blue_nebula", "23_Sky_purple_nebula", "24_Sky_red_nebula", "25_Sky_galactic_centre" };
+            Matrix4x4 fromStars = Shader.GetGlobalMatrix("_PhainonWorldToInertial").inverse;
+            Vector3 seatPosition = camera.transform.position;
+            Quaternion seatRotation = camera.transform.rotation;
+            for (int i = 0; i < among.Length; i++)
+            {
+                Vector3 towards = fromStars.MultiplyVector(among[i].normalized);
+                camera.transform.SetPositionAndRotation(seatPosition + towards * 80f, Quaternion.LookRotation(towards));
+                float skyMean = Capture(camera, amongNames[i]);
+                // Not blank (checked by the capture) means the sky is drawn; this is the other half.
+                Check("the sky in '" + amongNames[i] + "' stays dark between the stars", skyMean < 0.16f, "mean brightness " + skyMean.ToString("0.000"));
+            }
+            camera.transform.SetPositionAndRotation(seatPosition, seatRotation);
+
             // Then with the Sun in the starboard forward window. Where the Sun is comes from the scene itself.
             float tilt = (float)craft.VehicleSpec.windowTiltDegrees;
             Quaternion attitudeNow = Quaternion.Euler(-(float)craft.Attitude.PitchDegrees, (float)craft.Attitude.YawDegrees, -(float)craft.Attitude.RollDegrees)
@@ -444,7 +462,7 @@ namespace Phainon.EditorTools
             return all.ToString();
         }
 
-        private static void Capture(Camera camera, string name)
+        private static float Capture(Camera camera, string name)
         {
             RenderTexture target = RenderTexture.GetTemporary(Width, Height, 24, RenderTextureFormat.ARGB32);
             RenderTexture previous = camera.targetTexture;
@@ -466,6 +484,7 @@ namespace Phainon.EditorTools
             File.WriteAllBytes(ShotFolder + "/" + name + ".jpg", image.EncodeToJPG(88));
             Object.Destroy(image);
             Check("picture '" + name + "' is not blank", mean > 0.004f, "mean brightness " + mean.ToString("0.000"));
+            return mean;
         }
     }
 }

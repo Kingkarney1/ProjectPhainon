@@ -98,7 +98,7 @@ namespace Phainon.EditorTools
             if (jupiter == null) Debug.LogWarning("[Phainon] Jupiter map not found at " + BuildPaths.JupiterTexture + ". Using the drawn planet.");
             UnityEditor.EditorUtility.SetDirty(sky);
 
-            // An inside-out sphere around the cabin. It is drawn first and writes no depth.
+            // An inside-out sphere around the cabin. Its shader draws it at the far plane, behind everything solid.
             GameObject dome = SceneKit.Sphere("Sky Dome", parent, Vector3.zero, 1500f, sky);
             var renderer = dome.GetComponent<MeshRenderer>();
             renderer.receiveShadows = false;
