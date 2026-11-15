@@ -14,6 +14,8 @@ namespace Phainon.EditorTools
         public const string MissionScene = Scenes + "/Mission.unity";
         public const string EarthDayTexture = Textures + "/EarthDay.jpg";
         public const string JupiterTexture = Textures + "/JupiterMap.jpg";
+        /// <summary>The cabin shell, seat and screens, converted from SourceArt/Hackathon.blend.</summary>
+        public const string CockpitModel = Root + "/Art/Models/Hackathon.obj";
         public const string VolumeProfile = "Assets/Settings/CockpitPostProcess.asset";
 
         public const int LayerCockpit = 6;

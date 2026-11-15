@@ -30,11 +30,24 @@ namespace Phainon.Tests
             Assert.IsFalse(craft.Comms.LinkEstablished);
             Assert.IsFalse(craft.LifeSupport.Enabled);
             Assert.IsTrue(craft.Warnings.MasterAlarmActive, "the crew wake to an alarm");
-            Assert.Less(craft.Attitude.WindowOffNadirDegrees, 14.0, "Jupiter is in the forward window");
-            Assert.AreEqual(0.0, craft.Science.PointingErrorDegrees, 3.0, "and close enough to the middle of it for the instruments");
+            Assert.AreEqual(35.0, craft.Attitude.WindowOffNadirDegrees, 4.0, "Jupiter is off to one side, in the starboard forward window");
             Assert.AreEqual(ControlId.MasterAlarm, craft.Mission.SuggestedControl);
             Assert.AreEqual(0, craft.GroundControl.History.Count, "nobody is talking");
             Assert.IsNotNull(craft.Story.Journal.Find(Mission01Jupiter.RecordInstruction), "the recovered instruction is in the log");
+        }
+
+        [Test]
+        public void TheRollTheCraftWokeWith_ComesBackToTheDial_OnceTheJetsAreOn()
+        {
+            Spacecraft craft = NewCraft();
+            double woke = craft.Attitude.RollDegrees;
+            Assert.Greater(Math.Abs(woke), 30.0, "the craft has drifted in roll");
+            for (int i = 0; i < 400; i++) craft.Tick(0.05);
+            Assert.AreEqual(woke, craft.Attitude.RollDegrees, 0.01, "nothing turns it without the jets");
+            craft.HandleControl(ControlId.Rcs, 1.0);
+            for (int i = 0; i < 600; i++) craft.Tick(0.05);
+            Assert.AreEqual(0.0, craft.Attitude.RollDegrees, 0.5);
+            Assert.AreEqual(0.0, craft.Science.PointingErrorDegrees, 3.0, "which also brings Jupiter in front of the instruments");
         }
 
         [Test]
@@ -152,6 +165,7 @@ namespace Phainon.Tests
             StoryMissionSpec mission = Mission01Jupiter.Create();
             mission.scenario.startAltitudeMeters = altitude;
             mission.scenario.pitchDegrees = -90.0 + new VehicleSpec().windowTiltDegrees;    // window dead on the planet
+            mission.scenario.rollDegrees = 0.0;
             mission.scenario.initialFaults = new FaultId[0];
             mission.scenario.batteryACharge = 1.0;
             mission.scenario.batteryBCharge = 1.0;

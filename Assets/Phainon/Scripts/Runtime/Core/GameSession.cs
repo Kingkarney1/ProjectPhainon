@@ -8,5 +8,7 @@ namespace Phainon
         public static GameMode Mode;
         /// <summary>True to carry on from the story save instead of starting the mission afresh.</summary>
         public static bool LoadSave;
+        /// <summary>True to start a new story at the seat, without the introduction and wake-up. Used by the editor's smoke test.</summary>
+        public static bool SkipSequences;
     }
 }

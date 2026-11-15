@@ -159,10 +159,18 @@ Tools/verify_without_unity.sh
 
 Runs the simulation tests on the editor's bundled Mono and type-checks every assembly against the editor's real DLLs. It cannot import assets, compile shaders or build the scene.
 
+## Checking the scene in Play mode
+
+**Phainon > Run Smoke Test** (or creating the empty file `Library/PhainonSmokeRequest` while the editor is open) starts the story mission in Play mode for about twenty seconds. It checks that every control can be seen and reached from the seat, works one button, switch, dial and the throttle, checks the three displays are live, and saves a picture of each view to `Logs/PhainonShots` with the results in `result.txt`. It does not touch the story save.
+
+## The cabin model
+
+The cabin shell, seat and screen housings are `Assets/Phainon/Art/Models/Hackathon.obj`, converted from `SourceArt/Hackathon.blend` (kept outside `Assets` because this editor has no Blender to import it with). To replace it, export from Blender as Wavefront OBJ with the default axes (Y up, -Z forward), modifiers applied and the object names kept, over the same file. `CockpitBuilder` scales and places it, gives each part a project material by name (`Seat`, `Screen...`, anything else is the shell), and fits the window glass, the three displays and the control panels to it; if its proportions change, the positions in `CockpitBuilder` need revisiting.
+
 ## Known limitations
 
 - The flight model is a deliberate simplification: planar motion over a round, non-rotating Earth. Orbits are stable and apoapsis/periapsis are computed properly, but there is no plane change, no Earth rotation and no re-entry heating.
-- Geometry is built from primitives and a few procedural meshes. Cockpit materials use small generated surface textures (grain, brushed metal, quilting), not authored texture maps.
+- The cabin model is an untextured blockout, so its shell, seat and screen housings are plain colours. The control panels, controls and everything outside are built from primitives and a few procedural meshes, with small generated surface textures.
 - All audio is synthesised placeholder. Replace any file in `Assets/Phainon/Audio` with a recording of the same name.
 - Ground Control is text only (no voice), covers the one mission, and its story flags are not saved between sessions.
 - Faults: one per flight, each fixed by a single switch procedure. There is no wear model, no difficulty setting and no multi-step repair.

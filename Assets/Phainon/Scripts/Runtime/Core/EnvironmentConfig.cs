@@ -44,6 +44,8 @@ namespace Phainon
         [Header("Away from Earth")]
         [Tooltip("Sunlight at Jupiter as a share of sunlight in Earth orbit. Far dimmer in reality; this keeps the cabin readable.")]
         public float deepSpaceSunScale = 0.55f;
+        [Tooltip("Strength of the soft light that stands in for sunlight bounced around the cabin, with the Sun full in the forward windows.")]
+        public float cabinBounceIntensity = 0.9f;
         [Tooltip("Light reflected into the cabin from Jupiter's clouds.")]
         public Color jupiterShine = new Color(0.085f, 0.070f, 0.050f);
 

@@ -2,14 +2,16 @@ using System.Collections.Generic;
 using Phainon.Cockpit;
 using Phainon.Simulation;
 using TMPro;
+using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Phainon.EditorTools
 {
     /// <summary>
-    /// Builds the crew cabin: pressure hull, forward window, seat, the instrument panels with all
-    /// their controls, and the cabin lighting. Dimensions are in metres with the crew member's eye
-    /// at (0, 1.22, 0) looking along +Z.
+    /// Builds the crew cabin: the modelled shell, seat and screens (Art/Models/Hackathon.obj), the
+    /// window glass, the instrument panels with all their controls, and the cabin lighting.
+    /// Dimensions are in metres with the crew member's eye at (0, 1.22, 0) looking along +Z.
     ///
     /// Panels are the unit of organisation. Each panel is a transform whose local XY plane is the
     /// panel face, so a new panel or control is positioned in simple 2D panel coordinates.
@@ -26,13 +28,16 @@ namespace Phainon.EditorTools
 
         public Transform Root { get; private set; }
         public CockpitLighting Lighting { get; private set; }
+        /// <summary>Sunlight bounced around the cabin; the environment sets its strength from where the Sun is.</summary>
+        public Light SunBounce { get; private set; }
+        public ReflectionProbe Probe { get; private set; }
         public ControlFactory Controls { get; private set; }
 
         private readonly AssetFactory assets;
         private readonly SpacecraftController spacecraft;
 
-        private Material hull, hullDark, structure, panel, panelBlack, bezel, glassBlack, fabric, fixture, floorMat, accent, glass;
-        private Material pad, marking, hazard, extinguisherRed, placard;
+        private Material shellMat, hullDark, structure, panel, panelBlack, bezel, glassBlack, fabric, fixture, accent, glass;
+        private Material marking, hazard;
 
         public CockpitBuilder(AssetFactory assets, SpacecraftController spacecraft)
         {
@@ -48,9 +53,8 @@ namespace Phainon.EditorTools
             Root.gameObject.layer = BuildPaths.LayerCockpit;
             Controls = new ControlFactory(assets, spacecraft);
 
-            BuildHull();
-            BuildWindow();
-            BuildSeat();
+            BuildModel();
+            BuildWindows();
             BuildConsoleStructure();
             BuildDisplayMounts();
             BuildAnnunciators();
@@ -59,7 +63,6 @@ namespace Phainon.EditorTools
             BuildLeftConsole();
             BuildRightConsole();
             BuildLighting();
-            BuildDressing();
 
             var backlight = Root.gameObject.AddComponent<PanelBacklight>();
             backlight.spacecraft = spacecraft;
@@ -68,145 +71,140 @@ namespace Phainon.EditorTools
 
         private void CreateMaterials()
         {
-            hull = assets.Lit("HullLining", new Color(0.36f, 0.37f, 0.36f), 0.0f, 0.18f, assets.Grain, 5f);
+            // The shell is one surface seen from inside, so it is drawn on both sides. The model's texture
+            // coordinates are not laid out for a tiled finish, so the modelled parts are plain colours.
+            shellMat = assets.Lit("CabinShell", new Color(0.21f, 0.22f, 0.23f), 0.0f, 0.3f);
+            shellMat.SetFloat("_Cull", 0f);
             hullDark = assets.Lit("HullLiningDark", new Color(0.17f, 0.18f, 0.19f), 0.0f, 0.2f, assets.Grain, 5f);
             structure = assets.Lit("StructureGrey", new Color(0.30f, 0.31f, 0.33f), 0.75f, 0.5f, assets.Brushed, 4f, false, 0.12f);
             panel = assets.Lit("PanelCharcoal", new Color(0.060f, 0.063f, 0.068f), 0.15f, 0.32f, assets.Grain, 9f);
             panelBlack = assets.Lit("PanelBlack", new Color(0.022f, 0.023f, 0.025f), 0.1f, 0.28f, assets.Grain, 9f);
             bezel = assets.Lit("DisplayBezel", new Color(0.03f, 0.031f, 0.034f), 0.4f, 0.55f);
             glassBlack = assets.Lit("ScreenGlass", new Color(0.004f, 0.005f, 0.007f), 0.0f, 0.92f);
-            fabric = assets.Lit("SeatFabric", new Color(0.075f, 0.085f, 0.11f), 0.0f, 0.12f, assets.Quilt, 3.5f, false, 0.4f);
-            floorMat = assets.Lit("FloorPlate", new Color(0.11f, 0.115f, 0.12f), 0.5f, 0.35f, assets.Brushed, 2.5f, false, 0.15f);
+            fabric = assets.Lit("SeatFabric", new Color(0.075f, 0.085f, 0.11f), 0.0f, 0.12f);
             accent = assets.Lit("AccentBlue", new Color(0.06f, 0.20f, 0.42f), 0.2f, 0.45f);
             fixture = assets.Emissive("LightFixture", new Color(0.9f, 0.9f, 0.86f), new Color(1.6f, 1.5f, 1.3f));
             glass = assets.Custom("WindowGlass", "Phainon/WindowGlass");
-            pad = assets.Lit("HullPadding", new Color(0.46f, 0.46f, 0.43f), 0.0f, 0.1f, assets.Quilt, 2.6f, false, 0.4f);
             marking = assets.Emissive("PanelMarking", new Color(0.8f, 0.82f, 0.84f), new Color(0.16f, 0.17f, 0.18f));
             hazard = assets.Lit("HazardAmber", new Color(0.85f, 0.55f, 0.04f), 0.0f, 0.35f);
-            extinguisherRed = assets.Lit("ExtinguisherRed", new Color(0.55f, 0.04f, 0.03f), 0.2f, 0.6f);
-            placard = assets.Lit("PlacardPlate", new Color(0.10f, 0.105f, 0.11f), 0.5f, 0.45f);
         }
 
-        // ---------------------------------------------------------------- pressure hull
+        // ---------------------------------------------------------------- modelled cabin
 
-        private void BuildHull()
+        // The model is authored at about four times life size with Z up. These place it so its floor
+        // is at y = 0 and the point its author put the camera at is the crew member's eye.
+        private const float ModelScale = 0.25828f;
+        private const float ModelFloor = -3.470f;       // model units, height of the floor
+        private const float ModelEyeForward = -0.0789f; // model units, how far forward the eye sits
+
+        /// <summary>A point given in the model's own (Blender) axes, as a cockpit position.</summary>
+        private static Vector3 FromModel(float right, float forward, float up)
         {
-            Transform shell = SceneKit.Empty("Hull", Root, Vector3.zero).transform;
-
-            // Interior volume: 2.5 m wide, 2.1 m high, from the rear bulkhead at z = -1.15 to the forward one at z = 1.5.
-            const float halfWidth = 1.25f, height = 2.1f, rear = -1.15f, front = 1.5f, wall = 0.12f;
-            float length = front - rear;
-            float midZ = (front + rear) * 0.5f;
-
-            SceneKit.Box("Floor", shell, new Vector3(0f, -wall * 0.5f, midZ), new Vector3(halfWidth * 2f + wall * 2f, wall, length + wall * 2f), floorMat, true);
-            SceneKit.Box("Ceiling", shell, new Vector3(0f, height + wall * 0.5f, midZ), new Vector3(halfWidth * 2f + wall * 2f, wall, length + wall * 2f), hull, true);
-            SceneKit.Box("Port Wall", shell, new Vector3(-halfWidth - wall * 0.5f, height * 0.5f, midZ), new Vector3(wall, height, length + wall * 2f), hull, true);
-            SceneKit.Box("Starboard Wall", shell, new Vector3(halfWidth + wall * 0.5f, height * 0.5f, midZ), new Vector3(wall, height, length + wall * 2f), hull, true);
-            SceneKit.Box("Rear Bulkhead", shell, new Vector3(0f, height * 0.5f, rear - wall * 0.5f), new Vector3(halfWidth * 2f, height, wall), hullDark, true);
-
-            // Forward bulkhead, built around the window opening.
-            float zf = front + wall * 0.5f;
-            SceneKit.Box("Forward Lower", shell, new Vector3(0f, WindowBottom * 0.5f, zf), new Vector3(halfWidth * 2f, WindowBottom, wall), hullDark, true);
-            SceneKit.Box("Forward Upper", shell, new Vector3(0f, (WindowTop + height) * 0.5f, zf), new Vector3(halfWidth * 2f, height - WindowTop, wall), hull, true);
-            float sideWidth = halfWidth - WindowHalfWidth;
-            float sideX = WindowHalfWidth + sideWidth * 0.5f;
-            float windowHeight = WindowTop - WindowBottom;
-            float windowMid = (WindowTop + WindowBottom) * 0.5f;
-            SceneKit.Box("Forward Port", shell, new Vector3(-sideX, windowMid, zf), new Vector3(sideWidth, windowHeight, wall), hull, true);
-            SceneKit.Box("Forward Starboard", shell, new Vector3(sideX, windowMid, zf), new Vector3(sideWidth, windowHeight, wall), hull, true);
-
-            // Chamfered upper corners give the cabin the tapered cross-section of a capsule.
-            const float chamfer = 0.62f;
-            float chamferLength = chamfer * Mathf.Sqrt(2f);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                SceneKit.Box("Upper Chamfer", shell, new Vector3(side * (halfWidth - chamfer * 0.5f), height - chamfer * 0.5f, midZ),
-                    new Vector3(chamferLength, 0.05f, length), hull, false, new Vector3(0f, 0f, -side * 45f));
-            }
-
-            // Frames and stringers.
-            for (float z = rear + 0.25f; z < front; z += 0.55f)
-            {
-                for (int side = -1; side <= 1; side += 2)
-                    SceneKit.Box("Frame", shell, new Vector3(side * (halfWidth - 0.02f), (height - chamfer) * 0.5f, z), new Vector3(0.04f, height - chamfer, 0.05f), structure, false, default(Vector3), false);
-                SceneKit.Box("Roof Frame", shell, new Vector3(0f, height - 0.02f, z), new Vector3((halfWidth - chamfer) * 2f, 0.04f, 0.05f), structure, false, default(Vector3), false);
-            }
-            for (int side = -1; side <= 1; side += 2)
-            {
-                SceneKit.Box("Stringer", shell, new Vector3(side * (halfWidth - 0.025f), 1.05f, midZ), new Vector3(0.035f, 0.05f, length), structure, false, default(Vector3), false);
-                SceneKit.Cylinder("Handrail", shell, new Vector3(side * (halfWidth - chamfer * 0.5f - 0.05f), height - chamfer * 0.5f - 0.06f, 0.15f), 0.014f, 1.5f, structure, Axis.Z);
-            }
-
-            // Stowage lockers on the side walls behind the seat.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    Vector3 at = new Vector3(side * (halfWidth - 0.09f), 0.38f + i * 0.34f, -0.72f);
-                    SceneKit.Box("Locker", shell, at, new Vector3(0.18f, 0.31f, 0.62f), hullDark, false, default(Vector3), false);
-                    SceneKit.Box("Locker Latch", shell, at + new Vector3(-side * 0.095f, 0f, 0.2f), new Vector3(0.012f, 0.035f, 0.07f), structure, false, default(Vector3), false);
-                    TextMeshPro tag = SceneKit.Label("STOWAGE " + (side < 0 ? "P" : "S") + (i + 1), shell, at + new Vector3(-side * 0.0915f, 0.1f, -0.05f), 9f,
-                        new Color(0.55f, 0.57f, 0.6f), 30f);
-                    tag.transform.localRotation = Quaternion.Euler(0f, side * 90f, 0f);
-                }
-            }
-
-            // Floor tread strips.
-            for (float z = rear + 0.3f; z < 0.3f; z += 0.3f)
-                SceneKit.Box("Tread", shell, new Vector3(0f, 0.003f, z), new Vector3(1.4f, 0.006f, 0.05f), structure, false, default(Vector3), false);
+            return new Vector3(right, up - ModelFloor, forward - ModelEyeForward) * ModelScale;
         }
 
-        // ---------------------------------------------------------------- forward window
-
-        public const float WindowHalfWidth = 0.92f;
-        public const float WindowBottom = 1.25f;
-        public const float WindowTop = 2.03f;
-
-        private void BuildWindow()
+        /// <summary>
+        /// The cabin shell, seat and three screen housings come from the artist's model. It carries no
+        /// materials of its own, so each part is given one of the project's; and no colliders, so it can
+        /// never come between the crew and a control.
+        /// </summary>
+        private void BuildModel()
         {
-            Transform window = SceneKit.Empty("Forward Window", Root, new Vector3(0f, (WindowTop + WindowBottom) * 0.5f, 1.5f)).transform;
-            float width = WindowHalfWidth * 2f;
-            float height = WindowTop - WindowBottom;
-            const float frame = 0.06f, depth = 0.10f;
+            var importer = AssetImporter.GetAtPath(BuildPaths.CockpitModel) as ModelImporter;
+            if (importer == null)
+            {
+                // Nothing stands in for a missing model: the cabin is visibly absent and the log says why.
+                Debug.LogError("[Phainon] Cockpit model not found at " + BuildPaths.CockpitModel + ". The cabin shell, seat and screens are missing.");
+                return;
+            }
+            if (importer.globalScale != 1f || importer.useFileScale || importer.importNormals != ModelImporterNormals.Calculate
+                || importer.normalSmoothingAngle != 30f || importer.materialImportMode != ModelImporterMaterialImportMode.None)
+            {
+                importer.globalScale = 1f;
+                importer.useFileScale = false;
+                // The file has no normals. A hard-surface blockout wants its edges kept crisp.
+                importer.importNormals = ModelImporterNormals.Calculate;
+                importer.normalSmoothingAngle = 30f;
+                importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                importer.SaveAndReimport();
+            }
 
-            // Inner frame, standing proud of the bulkhead into the cabin.
-            SceneKit.Box("Frame Top", window, new Vector3(0f, height * 0.5f + frame * 0.5f, -depth * 0.5f), new Vector3(width + frame * 2f, frame, depth), structure);
-            SceneKit.Box("Frame Sill", window, new Vector3(0f, -height * 0.5f - frame * 0.5f, -depth * 0.5f), new Vector3(width + frame * 2f, frame, depth), structure);
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(BuildPaths.CockpitModel);
+            GameObject model = Object.Instantiate(asset);
+            model.name = "Cabin Model";
+            Transform t = model.transform;
+            t.SetParent(Root, false);
+
+            // The importer decides which way the file's forward axis ends up. The centre screen is ahead
+            // of the seat in the model, so it says which way that is.
+            Bounds? centreScreen = null;
+            Bounds all = new Bounds();
+            bool any = false;
+            foreach (MeshRenderer renderer in model.GetComponentsInChildren<MeshRenderer>())
+            {
+                string part = renderer.name.ToLowerInvariant();
+                bool seat = part.Contains("seat"), screen = part.Contains("screen");
+                Material material = seat ? fabric : (screen ? bezel : shellMat);
+                var materials = new Material[renderer.sharedMaterials.Length];
+                for (int i = 0; i < materials.Length; i++) materials[i] = material;
+                renderer.sharedMaterials = materials;
+                // The shell must stop sunlight whichever way its faces point, so light only enters by the windows.
+                renderer.shadowCastingMode = seat || screen ? ShadowCastingMode.On : ShadowCastingMode.TwoSided;
+                if (screen && !part.Contains(".001") && !part.Contains("001")) centreScreen = renderer.bounds;
+                if (any) all.Encapsulate(renderer.bounds); else { all = renderer.bounds; any = true; }
+            }
+            bool reversed = centreScreen.HasValue && centreScreen.Value.center.z < 0f;
+            t.localRotation = Quaternion.Euler(0f, reversed ? 180f : 0f, 0f);
+            t.localScale = Vector3.one * ModelScale;
+            t.localPosition = new Vector3(0f, -ModelFloor, -ModelEyeForward) * ModelScale;
+            SceneKit.SetLayer(model, BuildPaths.LayerCockpit);
+            Debug.Log("[Phainon] Cockpit model placed: " + model.GetComponentsInChildren<MeshRenderer>().Length + " parts, model bounds "
+                      + all.min.ToString("0.00") + " to " + all.max.ToString("0.00") + (centreScreen.HasValue ? "" : ", centre screen not identified")
+                      + (reversed ? ", turned to face forward" : ""));
+
+            // The model is open behind the seat. A plain bulkhead closes the cabin.
+            SceneKit.Box("Rear Bulkhead", Root, new Vector3(0f, 1.01f, -1.34f), new Vector3(3.0f, 2.1f, 0.05f), hullDark, true);
+        }
+
+        // ---------------------------------------------------------------- windows
+
+        /// <summary>Glass in the model's window openings: two forward panes either side of the centre post, and one each side.</summary>
+        private void BuildWindows()
+        {
+            Transform windows = SceneKit.Empty("Windows", Root, Vector3.zero).transform;
             for (int side = -1; side <= 1; side += 2)
             {
-                SceneKit.Box("Frame Side", window, new Vector3(side * (WindowHalfWidth + frame * 0.5f), 0f, -depth * 0.5f), new Vector3(frame, height, depth), structure);
-                SceneKit.Box("Mullion", window, new Vector3(side * 0.33f, 0f, 0.02f), new Vector3(0.032f, height, 0.07f), structure);
+                // Corners of each opening, read from the model: inner and outer at the sill, then at the head.
+                Pane("Forward Pane", windows, side, FromModel(0.568f, 3.356f, 1.474f), FromModel(2.987f, 2.756f, 0.859f),
+                    FromModel(2.428f, 2.167f, 3.359f), FromModel(0.825f, 2.415f, 3.356f));
+                Pane("Side Pane", windows, side, FromModel(3.319f, 2.576f, 0.459f), FromModel(4.081f, 1.361f, 0.162f),
+                    FromModel(3.175f, 1.717f, 3.357f), FromModel(2.804f, 2.031f, 3.357f));
             }
+        }
 
-            // Frame fasteners.
-            for (float x = -WindowHalfWidth; x <= WindowHalfWidth + 0.001f; x += 0.23f)
+        /// <summary>
+        /// One pane through four corners given for the starboard side (sill inner, sill outer, head outer,
+        /// head inner); side -1 mirrors it to port. It sits just outside the shell and a little oversize,
+        /// so its edges are hidden behind the wall around the opening.
+        /// </summary>
+        private void Pane(string name, Transform parent, int side, Vector3 sillInner, Vector3 sillOuter, Vector3 headOuter, Vector3 headInner)
+        {
+            if (side < 0)
             {
-                SceneKit.Cylinder("Bolt", window, new Vector3(x, height * 0.5f + frame * 0.5f, -depth - 0.002f), 0.009f, 0.006f, panelBlack, Axis.Z);
-                SceneKit.Cylinder("Bolt", window, new Vector3(x, -height * 0.5f - frame * 0.5f, -depth - 0.002f), 0.009f, 0.006f, panelBlack, Axis.Z);
+                sillInner.x = -sillInner.x; sillOuter.x = -sillOuter.x; headOuter.x = -headOuter.x; headInner.x = -headInner.x;
             }
+            Vector3 centre = (sillInner + sillOuter + headOuter + headInner) * 0.25f;
+            Vector3 across = ((sillOuter - sillInner) + (headOuter - headInner)).normalized;
+            Vector3 up = ((headInner - sillInner) + (headOuter - sillOuter)).normalized;
+            Vector3 outward = Vector3.Cross(across, up).normalized;
+            // Away from the crew member's eye, whichever way the corners ran.
+            if (Vector3.Dot(outward, centre - EyePosition) < 0f) outward = -outward;
+            float width = Mathf.Max((sillOuter - sillInner).magnitude, (headOuter - headInner).magnitude) * 1.2f;
+            float height = Mathf.Max((headInner - sillInner).magnitude, (headOuter - sillOuter).magnitude) * 1.2f;
 
-            // The pane sits in the middle of the bulkhead thickness.
-            GameObject pane = SceneKit.Quad("Pane", window, new Vector3(0f, 0f, 0.06f), new Vector2(width, height), glass);
+            GameObject pane = SceneKit.Quad(name, parent, centre + outward * 0.04f, new Vector2(width, height), glass);
+            pane.transform.localRotation = Quaternion.LookRotation(outward, up);
             pane.GetComponent<Renderer>().receiveShadows = false;
-        }
-
-        // ---------------------------------------------------------------- seat
-
-        private void BuildSeat()
-        {
-            Transform seat = SceneKit.Empty("Command Seat", Root, new Vector3(0f, 0f, -0.12f)).transform;
-            SceneKit.Box("Pedestal", seat, new Vector3(0f, 0.19f, 0f), new Vector3(0.36f, 0.38f, 0.42f), structure);
-            SceneKit.Box("Pan", seat, new Vector3(0f, 0.44f, 0.06f), new Vector3(0.52f, 0.11f, 0.52f), fabric);
-            SceneKit.Box("Back", seat, new Vector3(0f, 0.93f, -0.27f), new Vector3(0.52f, 0.92f, 0.11f), fabric, false, new Vector3(-7f, 0f, 0f));
-            SceneKit.Box("Headrest", seat, new Vector3(0f, 1.44f, -0.30f), new Vector3(0.30f, 0.20f, 0.10f), fabric, false, new Vector3(-7f, 0f, 0f));
-            for (int side = -1; side <= 1; side += 2)
-            {
-                SceneKit.Box("Bolster", seat, new Vector3(side * 0.29f, 0.95f, -0.22f), new Vector3(0.06f, 0.78f, 0.20f), fabric, false, new Vector3(-7f, 0f, 0f));
-                SceneKit.Box("Armrest", seat, new Vector3(side * 0.31f, 0.63f, 0.05f), new Vector3(0.07f, 0.05f, 0.42f), panelBlack);
-                SceneKit.Box("Armrest Post", seat, new Vector3(side * 0.31f, 0.52f, -0.10f), new Vector3(0.04f, 0.20f, 0.05f), structure);
-                SceneKit.Box("Harness", seat, new Vector3(side * 0.12f, 0.98f, -0.205f), new Vector3(0.05f, 0.80f, 0.012f), hullDark, false, new Vector3(-7f, 0f, 0f), false);
-            }
-            SceneKit.Box("Footrest", seat, new Vector3(0f, 0.12f, 0.66f), new Vector3(0.50f, 0.03f, 0.22f), structure, false, new Vector3(-22f, 0f, 0f));
         }
 
         // ---------------------------------------------------------------- console structure
@@ -215,25 +213,12 @@ namespace Phainon.EditorTools
         {
             Transform console = SceneKit.Empty("Console Structure", Root, Vector3.zero).transform;
 
-            // Solid masses sit strictly below and behind the panel faces, so no structure can cover a control.
-            SceneKit.Box("Console Body", console, new Vector3(0f, 0.275f, 1.02f), new Vector3(2.5f, 0.55f, 0.96f), panelBlack, true);
-            SceneKit.Box("Display Housing", console, new Vector3(0f, 0.96f, 1.22f), new Vector3(2.5f, 0.52f, 0.50f), panelBlack, true);
-            SceneKit.Box("Knee Panel", console, new Vector3(0f, 0.36f, 0.63f), new Vector3(1.02f, 0.44f, 0.20f), panelBlack, true, new Vector3(-12f, 0f, 0f));
-
-            // Glare shield: a hood over the displays. Its front edge stops short of the annunciator row
-            // so the row stays in view from the seat, even when acceleration presses the head back.
-            SceneKit.Box("Glare Shield", console, new Vector3(0f, 1.205f, 1.01f), new Vector3(2.5f, 0.035f, 0.62f), panel, false, new Vector3(-3f, 0f, 0f));
-
-            // Side console pedestals under the left and right panels.
+            // Pedestals under the left and right panels. They sit strictly below the panel faces, so no structure can cover a control.
             for (int side = -1; side <= 1; side += 2)
             {
-                SceneKit.Box("Side Pedestal", console, new Vector3(side * 0.70f, 0.30f, 0.32f), new Vector3(0.46f, 0.60f, 0.78f), panelBlack, true, new Vector3(0f, side * 25f, 0f));
-                SceneKit.Box("Pedestal Trim", console, new Vector3(side * 0.50f, 0.02f, 0.26f), new Vector3(0.04f, 0.04f, 0.86f), accent, false, new Vector3(0f, side * 25f, 0f), false);
+                SceneKit.Box("Side Pedestal", console, new Vector3(side * 0.70f, 0.26f, 0.30f), new Vector3(0.46f, 0.52f, 0.78f), panelBlack, true, new Vector3(0f, side * 25f, 0f));
+                SceneKit.Box("Pedestal Trim", console, new Vector3(side * 0.50f, 0.02f, 0.24f), new Vector3(0.04f, 0.04f, 0.86f), accent, false, new Vector3(0f, side * 25f, 0f), false);
             }
-
-            // Cable conduits running to the overhead.
-            for (int side = -1; side <= 1; side += 2)
-                SceneKit.Cylinder("Conduit", console, new Vector3(side * 1.16f, 1.55f, 1.40f), 0.022f, 1.0f, structure, Axis.Y);
         }
 
         /// <summary>
@@ -267,39 +252,29 @@ namespace Phainon.EditorTools
 
         private void BuildDisplayMounts()
         {
-            // Three display units wrapped around the crew member: centre head-on, the outer two angled in.
-            CentreDisplayMount = DisplayUnit("Display Unit 2 (Centre)", new Vector3(0f, 0.955f, 0.86f), new Vector3(14f, 0f, 0f));
-            LeftDisplayMount = DisplayUnit("Display Unit 1 (Left)", new Vector3(-0.515f, 0.955f, 0.80f), new Vector3(14f, -22f, 0f));
-            RightDisplayMount = DisplayUnit("Display Unit 3 (Right)", new Vector3(0.515f, 0.955f, 0.80f), new Vector3(14f, 22f, 0f));
+            // The live displays sit in the recesses of the model's three screens: centre head-on, the outer
+            // two turned in by fifteen degrees. The outer recesses are smaller, so those displays are scaled to fit.
+            CentreDisplayMount = DisplayUnit("Display Unit 2 (Centre)", FromModel(0f, 2.940f, 0.022f), 0f, 0.98f, new Vector2(0.438f, 0.336f));
+            LeftDisplayMount = DisplayUnit("Display Unit 1 (Left)", FromModel(-1.979f, 2.697f, -0.063f), -15f, 0.87f, new Vector2(0.390f, 0.299f));
+            RightDisplayMount = DisplayUnit("Display Unit 3 (Right)", FromModel(1.979f, 2.697f, -0.063f), 15f, 0.87f, new Vector2(0.390f, 0.299f));
         }
 
-        private Transform DisplayUnit(string name, Vector3 position, Vector3 euler)
+        /// <summary>
+        /// A mount on a screen recess. The recess face gets black glass, and the display is drawn at the
+        /// mount in the middle of it, scaled to fit.
+        /// </summary>
+        private Transform DisplayUnit(string name, Vector3 recessCentre, float yaw, float scale, Vector2 recessSize)
         {
-            Transform mount = SceneKit.Empty(name, Root, position, euler).transform;
-            Vector2 outer = ScreenSize + new Vector2(0.06f, 0.06f);
-
-            // The housing starts just behind the glass plane and is a little larger than the bezel, closing the gaps between units.
-            SceneKit.Box("Housing", mount, new Vector3(0f, 0f, 0.002f + 0.07f), new Vector3(outer.x + 0.04f, outer.y + 0.04f, 0.14f), panelBlack, true);
-            // Bezel frame around the glass, standing 6 mm proud.
-            float bar = 0.03f;
-            SceneKit.Box("Bezel Top", mount, new Vector3(0f, ScreenSize.y * 0.5f + bar * 0.5f, -0.003f), new Vector3(outer.x, bar, 0.006f), bezel, false, default(Vector3), false);
-            SceneKit.Box("Bezel Bottom", mount, new Vector3(0f, -ScreenSize.y * 0.5f - bar * 0.5f, -0.003f), new Vector3(outer.x, bar, 0.006f), bezel, false, default(Vector3), false);
-            SceneKit.Box("Bezel Left", mount, new Vector3(-ScreenSize.x * 0.5f - bar * 0.5f, 0f, -0.003f), new Vector3(bar, ScreenSize.y, 0.006f), bezel, false, default(Vector3), false);
-            SceneKit.Box("Bezel Right", mount, new Vector3(ScreenSize.x * 0.5f + bar * 0.5f, 0f, -0.003f), new Vector3(bar, ScreenSize.y, 0.006f), bezel, false, default(Vector3), false);
-            SceneKit.Quad("Glass", mount, new Vector3(0f, 0f, -0.0005f), ScreenSize, glassBlack);
-
-            // Soft keys along the lower bezel: dressing that makes the unit read as avionics.
-            for (int i = 0; i < 6; i++)
-            {
-                float x = Mathf.Lerp(-ScreenSize.x * 0.42f, ScreenSize.x * 0.42f, i / 5f);
-                SceneKit.Box("Bezel Key", mount, new Vector3(x, -ScreenSize.y * 0.5f - bar * 0.5f, -0.0075f), new Vector3(0.034f, 0.012f, 0.004f), panel, false, default(Vector3), false);
-            }
+            Transform recess = SceneKit.Empty(name + " Recess", Root, recessCentre, new Vector3(0f, yaw, 0f)).transform;
+            SceneKit.Quad("Glass", recess, new Vector3(0f, 0f, -0.001f), recessSize, glassBlack);
+            Transform mount = SceneKit.Empty(name, recess, new Vector3(0f, 0f, -0.002f)).transform;
+            mount.localScale = Vector3.one * scale;
             return mount;
         }
 
         private void BuildAnnunciators()
         {
-            Transform strip = Panel("Annunciator Panel", new Vector3(0f, 1.112f, 0.902f), new Vector3(14f, 0f, 0f), new Vector2(0.56f, 0.044f), false);
+            Transform strip = Panel("Annunciator Panel", new Vector3(0f, 1.135f, 0.775f), Vector3.zero, new Vector2(0.56f, 0.044f), false);
             SceneKit.Box("Backing", strip, new Vector3(0f, 0f, 0.006f), new Vector3(0.56f, 0.044f, 0.012f), panelBlack, false, default(Vector3), false);
 
             Vector2 size = new Vector2(0.080f, 0.026f);
@@ -318,7 +293,7 @@ namespace Phainon.EditorTools
         private void BuildMainPanel()
         {
             Vector2 size = new Vector2(1.02f, 0.34f);
-            Transform p = Panel("Main Control Panel", new Vector3(0f, 0.655f, 0.60f), new Vector3(55f, 0f, 0f), size, true, new Vector3(2.5f, 0.36f, 0.30f));
+            Transform p = Panel("Main Control Panel", new Vector3(0f, 0.555f, 0.56f), new Vector3(55f, 0f, 0f), size, true, new Vector3(1.06f, 0.36f, 0.22f));
 
             Controls.AddLabel("SYSTEMS", p, new Vector2(-0.215f, 0.148f), 7f, false);
             Controls.AddLabel("PROPELLANT  /  COMMUNICATIONS", p, new Vector2(0f, -0.152f), 6f, false);
@@ -361,13 +336,13 @@ namespace Phainon.EditorTools
         // ---------------------------------------------------------------- overhead panel
 
         /// <summary>
-        /// Electrical and utility switches on a panel hung from the cabin roof, angled down at the
-        /// seat. It sits well above the line of sight to the top of the window.
+        /// Electrical and utility switches on a panel above the forward windows, angled down at the
+        /// seat. It sits above the line of sight to the top of the glass.
         /// </summary>
         private void BuildOverheadPanel()
         {
             Vector2 size = new Vector2(0.58f, 0.20f);
-            Transform p = Panel("Overhead Panel", new Vector3(0f, 2.02f, 0.70f), new Vector3(-49f, 0f, 0f), size, true, new Vector3(0.62f, 0.24f, 0.12f));
+            Transform p = Panel("Overhead Panel", new Vector3(0f, 1.705f, 0.353f), new Vector3(-54f, 0f, 0f), size, true, new Vector3(0.62f, 0.24f, 0.12f));
 
             Controls.AddLabel("ELECTRICAL", p, new Vector2(-0.135f, 0.083f), 7f, false);
             Controls.AddLabel("UTILITY", p, new Vector2(0.125f, 0.083f), 7f, false);
@@ -396,7 +371,7 @@ namespace Phainon.EditorTools
         private void BuildLeftConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
-            Transform p = Panel("Propulsion Console (Left)", new Vector3(-0.62f, 0.725f, 0.36f), new Vector3(70f, -25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
+            Transform p = Panel("Propulsion Console (Left)", new Vector3(-0.62f, 0.65f, 0.34f), new Vector3(70f, -25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("PROPULSION", p, new Vector2(0f, 0.268f), 8f, false);
 
             Controls.Throttle(p, new Vector2(-0.085f, -0.035f), ControlId.Throttle, "THROTTLE");
@@ -409,7 +384,7 @@ namespace Phainon.EditorTools
         private void BuildRightConsole()
         {
             Vector2 size = new Vector2(0.38f, 0.58f);
-            Transform p = Panel("Flight Control Console (Right)", new Vector3(0.62f, 0.725f, 0.36f), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
+            Transform p = Panel("Flight Control Console (Right)", new Vector3(0.62f, 0.65f, 0.34f), new Vector3(70f, 25f, 0f), size, true, new Vector3(0.42f, 0.62f, 0.22f));
             Controls.AddLabel("FLIGHT CONTROL", p, new Vector2(0f, 0.268f), 8f, false);
 
             Controls.Dial(p, new Vector2(-0.085f, 0.135f), ControlId.NavMode, "NAV MODE", 0f, "{0}", 0f, 3f, new[] { "STBY", "ASCENT", "ORBIT", "RETRO" });
@@ -441,84 +416,6 @@ namespace Phainon.EditorTools
             }
         }
 
-        // ---------------------------------------------------------------- dressing
-
-        /// <summary>
-        /// Passive detail that makes the cabin read as a working spacecraft: wall padding, the aft
-        /// hatch, vents, cable runs, a fire extinguisher and placards. None of it is interactive, and
-        /// none of it has a collider, so it cannot get between the crew and a control.
-        /// </summary>
-        private void BuildDressing()
-        {
-            Transform dressing = SceneKit.Empty("Dressing", Root, Vector3.zero).transform;
-            const float wallX = 1.25f;
-
-            // Quilted padding between the frames, on the side walls and overhead.
-            float[] bays = { -0.625f, -0.075f, 0.475f };
-            foreach (float z in bays)
-            {
-                for (int side = -1; side <= 1; side += 2)
-                {
-                    SceneKit.Box("Wall Pad", dressing, new Vector3(side * (wallX - 0.012f), 1.27f, z), new Vector3(0.024f, 0.30f, 0.44f), pad, false, default(Vector3), false);
-                    SceneKit.Box("Roof Pad", dressing, new Vector3(side * 0.31f, 2.088f, z), new Vector3(0.50f, 0.024f, 0.44f), pad, false, default(Vector3), false);
-                }
-            }
-
-            // Cabin air vents on the side walls in the forward bay.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                Vector3 at = new Vector3(side * (wallX - 0.012f), 1.30f, 1.02f);
-                SceneKit.Box("Vent Frame", dressing, at, new Vector3(0.024f, 0.16f, 0.26f), structure, false, default(Vector3), false);
-                for (int i = 0; i < 6; i++)
-                    SceneKit.Box("Vent Slat", dressing, at + new Vector3(-side * 0.013f, -0.055f + i * 0.022f, 0f), new Vector3(0.012f, 0.008f, 0.22f), panelBlack, false, new Vector3(0f, 0f, side * 25f), false);
-            }
-
-            // Cable runs along the base of each wall, clamped at every frame.
-            for (int side = -1; side <= 1; side += 2)
-            {
-                SceneKit.Cylinder("Cable Run", dressing, new Vector3(side * (wallX - 0.04f), 0.05f, 0.17f), 0.028f, 2.55f, hullDark, Axis.Z);
-                SceneKit.Cylinder("Cable Run", dressing, new Vector3(side * (wallX - 0.035f), 0.105f, 0.17f), 0.016f, 2.55f, accent, Axis.Z);
-                for (float z = -0.9f; z < 1.45f; z += 0.55f)
-                    SceneKit.Box("Cable Clamp", dressing, new Vector3(side * (wallX - 0.04f), 0.07f, z), new Vector3(0.09f, 0.14f, 0.03f), structure, false, default(Vector3), false);
-            }
-
-            // Aft hatch in the rear bulkhead.
-            Transform hatch = SceneKit.Empty("Aft Hatch", dressing, new Vector3(0f, 1.08f, -1.15f)).transform;
-            SceneKit.Cylinder("Coaming", hatch, new Vector3(0f, 0f, 0.02f), 0.47f, 0.04f, structure, Axis.Z);
-            SceneKit.Cylinder("Door", hatch, new Vector3(0f, 0f, 0.035f), 0.41f, 0.04f, hullDark, Axis.Z);
-            SceneKit.Cylinder("Window", hatch, new Vector3(0f, 0.20f, 0.058f), 0.085f, 0.008f, glassBlack, Axis.Z);
-            SceneKit.Cylinder("Handwheel", hatch, new Vector3(0f, -0.08f, 0.075f), 0.13f, 0.02f, structure, Axis.Z);
-            SceneKit.Cylinder("Handwheel Hub", hatch, new Vector3(0f, -0.08f, 0.085f), 0.035f, 0.04f, panelBlack, Axis.Z);
-            for (int i = 0; i < 8; i++)
-            {
-                float angle = i * 45f * Mathf.Deg2Rad;
-                SceneKit.Box("Latch", hatch, new Vector3(Mathf.Cos(angle) * 0.44f, Mathf.Sin(angle) * 0.44f, 0.05f), new Vector3(0.07f, 0.03f, 0.03f), panelBlack,
-                    false, new Vector3(0f, 0f, i * 45f), false);
-            }
-            Placard(dressing, "AFT HATCH", new Vector3(0f, 1.64f, -1.148f), new Vector3(0f, 180f, 0f), 0.30f, 20f, ControlFactory.Amber);
-
-            // Fire extinguisher on the port wall beside the seat.
-            Vector3 bottle = new Vector3(-(wallX - 0.075f), 0.50f, -0.20f);
-            SceneKit.Cylinder("Extinguisher", dressing, bottle, 0.055f, 0.34f, extinguisherRed, Axis.Y);
-            SceneKit.Cylinder("Extinguisher Valve", dressing, bottle + new Vector3(0f, 0.20f, 0f), 0.022f, 0.07f, panelBlack, Axis.Y);
-            SceneKit.Box("Extinguisher Strap", dressing, bottle + new Vector3(0f, 0.04f, 0f), new Vector3(0.13f, 0.03f, 0.13f), structure, false, default(Vector3), false);
-            Placard(dressing, "FIRE EXT", new Vector3(-(wallX - 0.003f), 0.80f, -0.20f), new Vector3(0f, -90f, 0f), 0.16f, 13f, ControlFactory.Red);
-
-            // Placards.
-            Placard(dressing, "PHAINON-1    CREW MODULE 01", new Vector3(0f, WindowTop + 0.03f, 1.397f), Vector3.zero, 0.46f, 13f, ControlFactory.LabelColor);
-            Placard(dressing, "EMERGENCY EGRESS  AFT", new Vector3(-(wallX - 0.026f), 1.27f, -0.075f), new Vector3(0f, -90f, 0f), 0.34f, 14f, ControlFactory.Amber);
-            Placard(dressing, "CABIN O2  100 KPA MAX", new Vector3(wallX - 0.026f, 1.27f, -0.075f), new Vector3(0f, 90f, 0f), 0.34f, 14f, ControlFactory.Blue);
-        }
-
-        /// <summary>A small engraved plate with a line of text, fixed to a surface.</summary>
-        private void Placard(Transform parent, string text, Vector3 position, Vector3 euler, float width, float emMillimetres, Color color)
-        {
-            Transform root = SceneKit.Empty("Placard " + text, parent, position, euler).transform;
-            float height = emMillimetres * 0.0022f;
-            SceneKit.Box("Plate", root, new Vector3(0f, 0f, 0.002f), new Vector3(width, height, 0.004f), placard, false, default(Vector3), false);
-            SceneKit.Label(text, root, new Vector3(0f, 0f, -0.0006f), emMillimetres, color, width * 100f);
-        }
-
         // ---------------------------------------------------------------- lighting
 
         private void BuildLighting()
@@ -529,7 +426,7 @@ namespace Phainon.EditorTools
             var panels = new List<Light>();
 
             // Two overhead flood fixtures and a dimmer one behind the seat.
-            Vector3[] floodPositions = { new Vector3(-0.42f, 2.07f, 0.25f), new Vector3(0.42f, 2.07f, 0.25f), new Vector3(0f, 2.07f, -0.75f) };
+            Vector3[] floodPositions = { new Vector3(-0.5f, 1.883f, 0.05f), new Vector3(0.5f, 1.883f, 0.05f), new Vector3(0f, 1.883f, -0.55f) };
             foreach (Vector3 at in floodPositions)
             {
                 GameObject housing = SceneKit.Box("Flood Fixture", lights, at, new Vector3(0.34f, 0.03f, 0.11f), fixture, false, default(Vector3), false);
@@ -537,14 +434,30 @@ namespace Phainon.EditorTools
                 floods.Add(SceneKit.PointLight("Flood Light", lights, at + new Vector3(0f, -0.14f, 0f), new Color(1.0f, 0.96f, 0.88f), 1.1f, 4.2f));
             }
 
-            // Hooded lights under the glare shield wash the instrument panel.
-            panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(-0.3f, 1.16f, 0.50f), new Vector3(68f, 8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
-            panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(0.3f, 1.16f, 0.50f), new Vector3(68f, -8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
-            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(-0.66f, 1.25f, 0.30f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
-            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(0.66f, 1.25f, 0.30f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
+            // Small lights above the instrument panel wash it from the crew's side.
+            panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(-0.3f, 1.10f, 0.40f), new Vector3(68f, 8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
+            panels.Add(SceneKit.SpotLight("Panel Light", lights, new Vector3(0.3f, 1.10f, 0.40f), new Vector3(68f, -8f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.4f, 95f));
+            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(-0.66f, 1.18f, 0.28f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
+            panels.Add(SceneKit.SpotLight("Console Light", lights, new Vector3(0.66f, 1.18f, 0.28f), new Vector3(80f, 0f, 0f), new Color(0.80f, 0.90f, 1.0f), 0.5f, 1.1f, 80f));
 
             Light alarm = SceneKit.PointLight("Alarm Beacon", lights, new Vector3(0f, 1.32f, 0.45f), new Color(1f, 0.12f, 0.08f), 0f, 3.2f);
-            Light glow = SceneKit.PointLight("Engine Glow", lights, new Vector3(0f, 1.62f, 1.38f), new Color(1f, 0.62f, 0.30f), 0f, 3.5f);
+            Light glow = SceneKit.PointLight("Engine Glow", lights, new Vector3(0f, 1.55f, 1.0f), new Color(1f, 0.62f, 0.30f), 0f, 3.5f);
+
+            SunBounce = SceneKit.PointLight("Sun Bounce", lights, new Vector3(0f, 1.35f, 0.30f), new Color(1f, 0.96f, 0.9f), 0f, 3.0f);
+
+            // What the cabin's metal and glass reflect. Rendered on request by the environment, a face at a time.
+            Probe = SceneKit.Empty("Cabin Reflection", lights, new Vector3(0f, 1.15f, 0.1f)).AddComponent<ReflectionProbe>();
+            Probe.mode = ReflectionProbeMode.Realtime;
+            Probe.refreshMode = ReflectionProbeRefreshMode.ViaScripting;
+            Probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.IndividualFaces;
+            Probe.resolution = 128;
+            Probe.size = new Vector3(3.2f, 2.6f, 3.2f);
+            Probe.nearClipPlane = 0.05f;
+            Probe.farClipPlane = 6f;
+            Probe.cullingMask = 1 << BuildPaths.LayerCockpit;
+            Probe.clearFlags = ReflectionProbeClearFlags.SolidColor;
+            Probe.backgroundColor = Color.black;
+            Probe.intensity = 0.8f;
 
             Lighting = lights.gameObject.AddComponent<CockpitLighting>();
             Lighting.spacecraft = spacecraft;

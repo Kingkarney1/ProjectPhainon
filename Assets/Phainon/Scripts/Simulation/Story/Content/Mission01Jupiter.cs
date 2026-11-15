@@ -52,7 +52,9 @@ namespace Phainon.Simulation
                 propellantFractions = new[] { 0.0, 0.0, 0.72 },
                 // Jupiter sits in the middle of the forward window as the seat sees it: the crew's eye
                 // line through the window is 13 degrees above the window's own axis.
-                pitchDegrees = -73.0,
+                // Drifting, rolled over: this attitude puts Jupiter in the starboard forward window, clear of the centre post.
+                pitchDegrees = -62.0,
+                rollDegrees = 76.0,
                 batteryA = true, batteryB = true, mainBus = true,
                 apu = true, fuelPump = false, tankPress = false,
                 commAntenna = true, comms = true,

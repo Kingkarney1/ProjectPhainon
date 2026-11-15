@@ -81,13 +81,17 @@ namespace Phainon.Simulation
             }
         }
 
-        /// <summary>Points the vehicle without turning it there. Used when a flight starts away from the pad.</summary>
+        /// <summary>
+        /// Points the vehicle without turning it there. Used when a flight starts away from the pad.
+        /// The roll is where the vehicle has drifted to, not a command: once the crew have control
+        /// again it comes back to what the roll dial asks for.
+        /// </summary>
         public void SetAttitude(double pitchDegrees, double yawDegrees, double rollDegrees)
         {
             PitchDegrees = SimMath.WrapDegrees(pitchDegrees);
             YawDegrees = yawDegrees;
             RollDegrees = SimMath.WrapDegrees(rollDegrees);
-            rollManualOffset = SimMath.WrapDegrees(rollDegrees - RollDial * 180.0);
+            rollManualOffset = 0.0;
         }
 
         public AttitudeSnapshot Capture()

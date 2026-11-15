@@ -28,7 +28,9 @@ namespace Phainon.Story
         [Tooltip("Head angles while slumped in the seat: yaw, pitch (positive looks down) and roll.")]
         [SerializeField] internal Vector3 slumped = new Vector3(-14f, 44f, 7f);
         [SerializeField] internal float displaysPitch = 14f;
-        [SerializeField] internal float windowPitch = -13f;
+        [Tooltip("Where the head ends up: the starboard forward window.")]
+        [SerializeField] internal float windowYaw = 29f;
+        [SerializeField] internal float windowPitch = -20f;
 
         private float timer;
         private bool running;
@@ -85,7 +87,7 @@ namespace Phainon.Story
             float toDisplays = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.36f, 0.60f, u));
             float toWindow = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.68f, 0.92f, u));
             float sway = reduced ? 0f : (1f - toWindow) * Mathf.Sin(Time.time * 0.7f);
-            cockpitCamera.DirectedYaw = Mathf.Lerp(slumped.x, 0f, toDisplays) + sway * 1.2f;
+            cockpitCamera.DirectedYaw = Mathf.Lerp(Mathf.Lerp(slumped.x, 0f, toDisplays), windowYaw, toWindow) + sway * 1.2f;
             cockpitCamera.DirectedPitch = Mathf.Lerp(Mathf.Lerp(slumped.y, displaysPitch, toDisplays), windowPitch, toWindow) + sway * 0.8f;
             cockpitCamera.DirectedRoll = reduced ? 0f : Mathf.Lerp(slumped.z, 0f, toDisplays);
 

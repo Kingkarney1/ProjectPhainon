@@ -34,6 +34,10 @@ namespace Phainon.Environment
         [SerializeField] internal Transform groundFrame;
         [SerializeField] internal Transform launchSite;
         [SerializeField] internal Light sun;
+        [Tooltip("A soft light inside the cabin, lit only while the Sun shines in through the forward windows.")]
+        [SerializeField] internal Light cabinBounce;
+        [Tooltip("The cabin as its metal and glass reflect it. Re-rendered now and then, not every frame.")]
+        [SerializeField] internal ReflectionProbe cabinProbe;
         [Tooltip("How quickly the view follows attitude changes. Smooths the 50 Hz simulation for display.")]
         [SerializeField] internal float attitudeSmoothing = 14f;
 
@@ -44,6 +48,7 @@ namespace Phainon.Environment
         private bool hasAttitude;
         private float cloudTime;
         private float earthshineNow;
+        private Vector3 probeSun;
 
         /// <summary>1 on the ground, falling to 0 in vacuum. Other effects use it to fade with the air.</summary>
         public float Atmosphere { get; private set; }
@@ -171,6 +176,21 @@ namespace Phainon.Environment
             // The Sun is harsher in vacuum, and switches off once the Earth is in the way.
             float intensity = Mathf.Lerp(config.sunIntensitySpace, config.sunIntensityGround, Atmosphere);
             sun.intensity = intensity * Daylight * (away ? config.deepSpaceSunScale : 1f);
+
+            if (cabinBounce != null)
+            {
+                // The cockpit never turns in the scene, so the forward windows always face this way.
+                float facing = Mathf.Clamp01(Vector3.Dot(sunDirection, new Vector3(0f, 0.3f, 0.954f)));
+                cabinBounce.color = config.sunColor;
+                cabinBounce.intensity = config.cabinBounceIntensity * facing * sun.intensity / Mathf.Max(0.01f, config.sunIntensitySpace);
+            }
+
+            // The reflection only needs redoing when the light has moved enough to show.
+            if (cabinProbe != null && Vector3.Angle(sunDirection, probeSun) > 5f)
+            {
+                probeSun = sunDirection;
+                cabinProbe.RenderProbe();
+            }
         }
 
         private void UpdateAmbient(Vector3 up, Vector3 sunDirection, bool away)

@@ -29,9 +29,13 @@ namespace Phainon
 
         public static bool Exists { get { return File.Exists(FilePath) || File.Exists(BackupPath); } }
 
+        /// <summary>While true nothing is written, so an automated run cannot replace the player's save.</summary>
+        internal static bool Suspended;
+
         /// <summary>Writes the save. Returns null when it worked, or why it did not.</summary>
         public static string Save(Spacecraft craft, string missionId)
         {
+            if (Suspended) return "saving is suspended";
             try
             {
                 var data = new StorySaveData { missionId = missionId, savedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), craft = craft.Capture() };

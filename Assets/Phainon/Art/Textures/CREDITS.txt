@@ -9,3 +9,6 @@ JupiterMap.jpg
   Cassini cylindrical colour map of Jupiter, PIA07782.
   Credit: NASA/JPL/Space Science Institute. Public domain.
   https://photojournal.jpl.nasa.gov/catalog/PIA07782
+
+../Models/Hackathon.obj
+  The cabin shell, seat and screen housings. Converted from the project's own SourceArt/Hackathon.blend.

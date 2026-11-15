@@ -23,7 +23,7 @@ namespace Phainon.EditorTools
         /// Raise this whenever the builders change what they generate. An open editor then rebuilds
         /// the scene by itself, so the scene on disk can never lag behind the code that makes it.
         /// </summary>
-        public const int BuildVersion = 10;
+        public const int BuildVersion = 12;
         private const string StampPath = "Library/PhainonBuildVersion.txt";
 
         public static bool SceneIsCurrent
@@ -252,12 +252,12 @@ namespace Phainon.EditorTools
             cockpitCamera.startPitch = 8f;
             cockpitCamera.presets = new[]
             {
-                new CockpitCameraController.ViewPreset { name = "Window", yaw = 0f, pitch = -13f },
-                new CockpitCameraController.ViewPreset { name = "Displays", yaw = 0f, pitch = 14f },
-                new CockpitCameraController.ViewPreset { name = "Main panel", yaw = 0f, pitch = 43f },
-                new CockpitCameraController.ViewPreset { name = "Left console", yaw = -62f, pitch = 36f },
-                new CockpitCameraController.ViewPreset { name = "Right console", yaw = 62f, pitch = 34f },
-                new CockpitCameraController.ViewPreset { name = "Overhead panel", yaw = 0f, pitch = -47f }
+                new CockpitCameraController.ViewPreset { name = "Window", yaw = 29f, pitch = -20f },
+                new CockpitCameraController.ViewPreset { name = "Displays", yaw = 0f, pitch = 21f },
+                new CockpitCameraController.ViewPreset { name = "Main panel", yaw = 0f, pitch = 49f },
+                new CockpitCameraController.ViewPreset { name = "Left console", yaw = -61f, pitch = 39f },
+                new CockpitCameraController.ViewPreset { name = "Right console", yaw = 61f, pitch = 39f },
+                new CockpitCameraController.ViewPreset { name = "Overhead panel", yaw = 0f, pitch = -54f }
             };
 
             var interaction = head.AddComponent<CockpitInteractionManager>();
@@ -282,6 +282,8 @@ namespace Phainon.EditorTools
             // World outside.
             var environment = new EnvironmentBuilder(assets, spacecraft, game);
             environment.Build();
+            environment.Director.cabinBounce = cockpit.SunBounce;
+            environment.Director.cabinProbe = cockpit.Probe;
 
             // Audio.
             var audioObject = new GameObject("Audio");

@@ -14,6 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords:
   - _HASEARTHTEX_ON
+  - _HASJUPITERTEX_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0

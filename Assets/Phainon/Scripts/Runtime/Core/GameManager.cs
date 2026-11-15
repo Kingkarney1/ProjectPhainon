@@ -29,6 +29,8 @@ namespace Phainon
             skipMenuOnLoad = false;
             GameSession.Mode = GameMode.Standard;
             GameSession.LoadSave = false;
+            GameSession.SkipSequences = false;
+            StorySave.Suspended = false;
         }
 
         public GameState State { get; private set; }
@@ -53,7 +55,7 @@ namespace Phainon
             {
                 skipMenuOnLoad = false;
                 // A new story opens with its introduction; a continued one goes straight back to the seat.
-                SetState(IsStory && !GameSession.LoadSave ? GameState.Intro : GameState.Flying);
+                SetState(IsStory && !GameSession.LoadSave && !GameSession.SkipSequences ? GameState.Intro : GameState.Flying);
             }
             else
             {
@@ -137,7 +139,7 @@ namespace Phainon
             Load(GameMode.Standard, false, false);
         }
 
-        private static void Load(GameMode mode, bool loadSave, bool skipMenu)
+        internal static void Load(GameMode mode, bool loadSave, bool skipMenu)
         {
             GameSession.Mode = mode;
             GameSession.LoadSave = loadSave;

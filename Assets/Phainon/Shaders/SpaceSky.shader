@@ -145,13 +145,46 @@ Shader "Phainon/SpaceSky"
                 return color;
             }
 
-            float3 Stars(float3 dir)
+            // The Milky Way, fixed among the stars: a band that swells and warms towards the galactic
+            // centre, is broken into clouds and is split by dust lanes. "crowd" comes back as how thick
+            // the star field is in this direction, for the faint stars that gather along the band.
+            float3 MilkyWay(float3 dir, out float crowd)
+            {
+                float3 pole = normalize(float3(0.35, 0.86, 0.37));
+                float3 centre = normalize(float3(0.86, -0.35, 0.0));
+                float latitude = dot(dir, pole);
+                float3 inPlane = dir - pole * latitude;
+                float towardsCentre = dot(inPlane, centre) / max(length(inPlane), 1e-4);    // cosine of galactic longitude
+                float inner = smoothstep(0.2, 1.0, towardsCentre);
+
+                float large = Fbm3(dir * 3.5 + 1.7);
+                float fine = Fbm3(dir * 12.0 + 5.3);
+                // The band wanders a little off its great circle and is widest in the inner galaxy.
+                float offset = latitude - (large - 0.5) * 0.07;
+                float width = lerp(0.085, 0.17, inner);
+                float band = exp(-(offset * offset) / (width * width));
+                float clouds = smoothstep(0.22, 0.72, large) * (0.55 + 0.45 * fine);
+                float bulge = exp(-latitude * latitude * 22.0 - (1.0 - towardsCentre) * 9.0);
+
+                // Dust: a ragged dark rift down the middle, strongest towards the centre.
+                float riftOffset = (latitude - (Fbm3(dir * 6.0 + 9.1) - 0.5) * 0.10) / 0.030;
+                float rift = exp(-riftOffset * riftOffset) * smoothstep(0.30, 0.62, fine) * (0.35 + 0.65 * inner);
+
+                crowd = band * (0.35 + 0.65 * clouds);
+                float glow = (band * clouds * lerp(0.45, 1.0, 0.5 + 0.5 * towardsCentre) + bulge * 0.6) * (1.0 - 0.8 * rift);
+                float3 tint = lerp(float3(0.60, 0.70, 0.95), float3(1.0, 0.86, 0.66), saturate(inner * 0.7 + bulge));
+                // Kept faint: it is a glow behind the stars, not a cloud in front of them.
+                return tint * (glow * 0.045);
+            }
+
+            float3 Stars(float3 dir, float crowd)
             {
                 float3 color = 0.0;
-                for (int layer = 0; layer < 2; layer++)
+                for (int layer = 0; layer < 3; layer++)
                 {
-                    float scale = layer == 0 ? 85.0 : 170.0;
-                    float threshold = layer == 0 ? 0.93 : 0.955;
+                    float scale = layer == 0 ? 85.0 : (layer == 1 ? 170.0 : 250.0);
+                    // The third layer is faint and thickens along the Milky Way.
+                    float threshold = layer == 0 ? 0.93 : (layer == 1 ? 0.955 : lerp(0.975, 0.86, crowd));
                     float3 p = dir * scale;
                     float3 cell = floor(p);
                     float3 local = frac(p) - 0.5;
@@ -161,7 +194,7 @@ Shader "Phainon/SpaceSky"
                     float3 offset = (Hash33(cell + 7.0) - 0.5) * 0.55;
                     float size = lerp(0.07, 0.15, rnd.y * rnd.y);
                     float falloff = smoothstep(size, 0.0, length(local - offset));
-                    float brightness = lerp(0.18, 1.8, pow(rnd.z, 5.0));
+                    float brightness = lerp(0.18, 1.8, pow(rnd.z, 5.0)) * (layer == 2 ? 0.3 : 1.0);
                     float3 tint = lerp(float3(0.72, 0.84, 1.0), float3(1.0, 0.90, 0.74), rnd.y);
                     color += falloff * brightness * tint * present;
                 }
@@ -380,10 +413,9 @@ Shader "Phainon/SpaceSky"
                 }
 
                 float3 inertialDir = normalize(mul(RotationOrIdentity(_PhainonWorldToInertial), viewDir));
-                // The Milky Way: a faint, mottled band along one great circle of the star field.
-                float galacticLatitude = dot(inertialDir, normalize(float3(0.35, 0.86, 0.37)));
-                float milkyWay = exp(-galacticLatitude * galacticLatitude * 26.0) * (0.35 + 0.65 * Fbm3(inertialDir * 5.0 + 1.7));
-                float3 starField = Stars(inertialDir) + float3(0.55, 0.60, 0.75) * (milkyWay * 0.05) + DeepSky(inertialDir);
+                float crowd;
+                float3 milkyWay = MilkyWay(inertialDir, crowd);
+                float3 starField = Stars(inertialDir, crowd) + milkyWay + DeepSky(inertialDir);
                 color += starField * (_StarBrightness * _PhainonStarVisibility * darkness);
                 return color;
             }
